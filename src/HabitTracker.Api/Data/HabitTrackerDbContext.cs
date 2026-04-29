@@ -12,7 +12,7 @@ public class HabitTrackerDbContext : DbContext
 
     }
     public DbSet<Habit> Habits => Set<Habit>();
-    public DbSet<HabitLog> habitLogs => Set<HabitLog>();
+    public DbSet<HabitLog> HabitLogs => Set<HabitLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
