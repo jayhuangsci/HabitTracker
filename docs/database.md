@@ -20,26 +20,19 @@ e.g "i ran 5 km today",DB should shore date,quantity
 
 HabitTable:
 
-Name
-
-ID
-
-unit
+1. ID
+2. Name
+3. Unit
+4. Description
+5. CreateAt
 
 HabitlogTable:
 
-
-ID
-
-habitID
-
-Date
-
-Quantity
-
-comment
-
-createdAt
+1. ID
+2. HabitId
+3. Date
+4. Quantity
+5. comment
 
 ## table interaction
 
