@@ -1,24 +1,20 @@
-﻿using System.Text;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+﻿using System.Windows;
+using HabitTracker.Services;
+using HabitTracker.ViewModels;
 
-namespace HabitTracker
+namespace HabitTracker;
+
+public partial class MainWindow : Window
 {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
-    public partial class MainWindow : Window
+    public MainWindow()
     {
-        public MainWindow()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
+
+        var apiService = new ApiService("http://localhost:5253/");
+        var viewModel = new HabitListViewModel(apiService);
+
+        DataContext = viewModel;
+
+        Loaded += async (_, _) => await viewModel.LoadHabitsAsync();
     }
 }
