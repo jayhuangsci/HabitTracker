@@ -44,11 +44,16 @@ public class ApiService
         await EnsureSuccessAsync(response);
     }
 
-    public async Task<List<HabitLogDto>> GetHabitLogsAsync()
+    public async Task<List<HabitLogDto>> GetHabitLogsAsync(int? habitId = null)
     {
-        var response = await _httpClient.GetAsync("api/habit-logs");
+        var url = habitId.HasValue
+            ? $"api/habit-logs?habitId={habitId.Value}"
+            : "api/habit-logs";
+
+        var response = await _httpClient.GetAsync(url);
         return await ReadAsync<List<HabitLogDto>>(response);
     }
+
 
     public async Task<HabitLogDto> CreateHabitLogAsync(CreateHabitLogRequest request)
     {

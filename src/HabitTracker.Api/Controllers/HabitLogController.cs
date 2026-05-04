@@ -19,11 +19,20 @@ public class HabitLogsController: ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult <List<HabitLogResponse>>> GetHabitLogs()
+    public async Task<ActionResult<List<HabitLogResponse>>> GetHabitLogs([FromQuery] int? habitId)
     {
-        var habitLogs = await _dbContext.Set<HabitLog>()
-            .OrderBy(x => x.Date)
-            .ThenBy(x => x.Id)
+        var query = _dbContext.Set<HabitLog>()
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (habitId.HasValue)
+        {
+            query = query.Where(x => x.HabitId == habitId.Value);
+        }
+
+        var habitLogs = await query
+            .OrderByDescending(x => x.Date)
+            .ThenByDescending(x => x.Id)
             .Select(x => new HabitLogResponse
             {
                 Id = x.Id,
@@ -37,6 +46,7 @@ public class HabitLogsController: ControllerBase
 
         return Ok(habitLogs);
     }
+
     [HttpPost]
     public async Task<ActionResult<HabitLogResponse>> CreateHabitLog(CreateHabitLogRequest request)
     {
