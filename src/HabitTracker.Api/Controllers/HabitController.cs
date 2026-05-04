@@ -83,4 +83,73 @@ public class HabitController:ControllerBase
 
         return Created($"/api/habits/{habit.Id}", response);
     }
+    [HttpPut("{id:int}")]
+    
+    public async Task<ActionResult<HabitResponse>> UpdateHabit(int id, UpdateHabitRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+        {
+            return BadRequest(new { message = "Name is required." });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Unit))
+        {
+            return BadRequest(new { message = "Unit is required." });
+        }
+
+        var habit = await _dbContext.Habits.FindAsync(id);
+
+        if (habit is null)
+        {
+            return NotFound(new { message = "Habit not found." });
+        }
+
+        var normalizedName = request.Name.Trim();
+        var normalizedUnit = request.Unit.Trim();
+        var normalizedDescription = string.IsNullOrWhiteSpace(request.Description)
+            ? null
+            : request.Description.Trim();
+
+        var duplicateExists = await _dbContext.Habits
+            .AnyAsync(x => x.Id != id && x.Name == normalizedName);
+
+        if (duplicateExists)
+        {
+            return Conflict(new { message = "Habit name already exists." });
+        }
+
+        habit.Name = normalizedName;
+        habit.Unit = normalizedUnit;
+        habit.Description = normalizedDescription;
+
+        await _dbContext.SaveChangesAsync();
+
+        var response = new HabitResponse
+        {
+            Id = habit.Id,
+            Name = habit.Name,
+            Unit = habit.Unit,
+            Description = habit.Description,
+            CreatedAt = habit.CreatedAt
+        };
+
+        return Ok(response);
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteHabit(int id)
+    {
+        var habit = await _dbContext.Habits.FindAsync(id);
+
+        if (habit is null)
+        {
+            return NotFound(new { message = "Habit not found." });
+        }
+
+        _dbContext.Habits.Remove(habit);
+        await _dbContext.SaveChangesAsync();
+
+        return NoContent();
+    }
+
 }
