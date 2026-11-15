@@ -13,9 +13,30 @@ public class HabitTrackerDbContext : DbContext
     }
     public DbSet<Habit> Habits => Set<Habit>();
     public DbSet<HabitLog> HabitLogs => Set<HabitLog>();
+    public DbSet<WorkoutSession> Workouts => Set<WorkoutSession>();
+    public DbSet<WorkoutSet> WorkoutSets => Set<WorkoutSet>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<WorkoutSession>(entity =>
+        {
+            entity.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.HasIndex(x => x.Date);
+            entity.HasMany(x => x.Sets).WithOne(x => x.WorkoutSession)
+                .HasForeignKey(x => x.WorkoutSessionId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<WorkoutSet>(entity =>
+        {
+            entity.Property(x => x.ExerciseId).HasMaxLength(80).IsRequired();
+            entity.Property(x => x.LeftPlatesJson).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.RightPlatesJson).HasMaxLength(512).IsRequired();
+            entity.Property(x => x.Notes).HasMaxLength(500);
+            entity.HasIndex(x => x.ClientId).IsUnique();
+            entity.HasIndex(x => x.ExerciseId);
+            entity.ToTable(t => t.HasCheckConstraint("CK_WorkoutSets_Reps", "\"Reps\" BETWEEN 1 AND 100"));
+        });
         modelBuilder.Entity<Habit>(entity =>
         {
             entity.Property(x => x.Name)

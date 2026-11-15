@@ -15,7 +15,7 @@ namespace HabitTracker.Api.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.7");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.15");
 
             modelBuilder.Entity("HabitTracker.Api.Entities.Habit", b =>
                 {
@@ -87,6 +87,102 @@ namespace HabitTracker.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("HabitTracker.Api.Entities.WorkoutSession", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date");
+
+                    b.ToTable("Workouts");
+                });
+
+            modelBuilder.Entity("HabitTracker.Api.Entities.WorkoutSet", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("BarWeight")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ExerciseId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("LeftPlatesJson")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Reps")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RightPlatesJson")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("Rpe")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Unit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("WorkoutSessionId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId")
+                        .IsUnique();
+
+                    b.HasIndex("ExerciseId");
+
+                    b.HasIndex("WorkoutSessionId");
+
+                    b.ToTable("WorkoutSets", t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkoutSets_Reps", "\"Reps\" BETWEEN 1 AND 100");
+                        });
+                });
+
             modelBuilder.Entity("HabitTracker.Api.Entities.HabitLog", b =>
                 {
                     b.HasOne("HabitTracker.Api.Entities.Habit", "Habit")
@@ -98,9 +194,25 @@ namespace HabitTracker.Api.Migrations
                     b.Navigation("Habit");
                 });
 
+            modelBuilder.Entity("HabitTracker.Api.Entities.WorkoutSet", b =>
+                {
+                    b.HasOne("HabitTracker.Api.Entities.WorkoutSession", "WorkoutSession")
+                        .WithMany("Sets")
+                        .HasForeignKey("WorkoutSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("WorkoutSession");
+                });
+
             modelBuilder.Entity("HabitTracker.Api.Entities.Habit", b =>
                 {
                     b.Navigation("HabitLogs");
+                });
+
+            modelBuilder.Entity("HabitTracker.Api.Entities.WorkoutSession", b =>
+                {
+                    b.Navigation("Sets");
                 });
 #pragma warning restore 612, 618
         }
