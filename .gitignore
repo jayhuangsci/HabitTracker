@@ -4,3 +4,9 @@ obj/
 *.user
 *.suo
 *.log
+*.db
+*.db-shm
+*.db-wal
+.local/
+TestResults/
+artifacts/
