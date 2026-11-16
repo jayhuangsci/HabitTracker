@@ -1,0 +1,50 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Desktop, API, and domain
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore HabitTracker.slnx
+      - run: dotnet build HabitTracker.slnx -c Release --no-restore --warnaserror
+      - run: dotnet test HabitTracker.slnx -c Release --no-build --logger trx --results-directory TestResults
+      - run: dotnet tool restore
+      - run: dotnet ef migrations has-pending-model-changes --project src/HabitTracker.Api --no-build --configuration Release
+      - run: ./scripts/Publish-App.ps1 -SelfContained
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HabitTracker-win-x64
+          path: artifacts/HabitTracker-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-windows
+          path: TestResults
+
+  linux:
+    name: Cross-platform domain and API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test tests/HabitTracker.Core.Tests -c Release --logger trx --results-directory TestResults
+      - run: dotnet test tests/HabitTracker.Api.Tests -c Release --logger trx --results-directory TestResults
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-linux
+          path: TestResults

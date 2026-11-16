@@ -11,7 +11,8 @@ public sealed record PersonalRecord(string ExerciseId, string ExerciseName, deci
     decimal EstimatedOneRepMaxPounds, DateOnly Date)
 {
     public string WeightLabel => $"{BestWeightPounds:N1} lb";
-    public string EstimateLabel => $"{EstimatedOneRepMaxPounds:N1} lb estimated 1RM";
+    public string EstimateLabel => EstimatedOneRepMaxPounds > 0
+        ? $"{EstimatedOneRepMaxPounds:N1} lb estimated 1RM" : "No estimate · use sets of 1–12 reps";
 }
 
 public static class TrainingAnalytics
@@ -61,7 +62,7 @@ public static class WorkoutCsvExporter
                 PlateLoad.FormatStack(set.LeftPlates), PlateLoad.FormatStack(set.RightPlates), set.UnitSymbol,
                 PlateLoad.Format(set.TotalWeight), set.Reps.ToString(CultureInfo.InvariantCulture),
                 set.Rpe?.ToString(CultureInfo.InvariantCulture) ?? "", set.Notes ?? ""];
-            csv.AppendLine(string.Join(",", cells.Select(Escape)));
+            csv.Append(string.Join(",", cells.Select(Escape))).Append("\r\n");
         }
         return csv.ToString();
     }

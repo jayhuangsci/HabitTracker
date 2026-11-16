@@ -1,6 +1,45 @@
-@HabitTracker.Api_HostAddress = http://localhost:5253
+@baseUrl = http://localhost:5253
+@workoutId = 1
 
-GET {{HabitTracker.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Readiness
+GET {{baseUrl}}/health
 
-###
+### Exercise library
+GET {{baseUrl}}/api/training/exercises
+
+### Starter routines
+GET {{baseUrl}}/api/training/routines
+
+### Journal
+GET {{baseUrl}}/api/workouts
+
+### Create a session; use its returned ID as workoutId above
+POST {{baseUrl}}/api/workouts
+Content-Type: application/json
+
+{
+  "name": "Upper body",
+  "date": "2026-11-15"
+}
+
+### Log a set (use a fresh GUID for each genuinely new set)
+POST {{baseUrl}}/api/workouts/{{workoutId}}/sets
+Content-Type: application/json
+
+{
+  "clientId": "413ee0b8-9cc1-49af-8cf0-07b6e57bf660",
+  "exerciseId": "bench-press",
+  "unit": "Pounds",
+  "barWeight": 45,
+  "leftPlates": [45, 25, 10],
+  "rightPlates": [45, 25, 10],
+  "reps": 5,
+  "rpe": 8,
+  "kind": "Working"
+}
+
+### Complete a nonempty session
+POST {{baseUrl}}/api/workouts/{{workoutId}}/complete
+
+### Export original plate stacks
+GET {{baseUrl}}/api/workouts/export.csv
