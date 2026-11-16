@@ -4,6 +4,6 @@
              xmlns:local="clr-namespace:HabitTracker"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="Themes/FlatTheme.xaml" /></ResourceDictionary.MergedDictionaries></ResourceDictionary>
     </Application.Resources>
 </Application>

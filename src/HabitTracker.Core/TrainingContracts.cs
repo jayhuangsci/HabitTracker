@@ -2,8 +2,14 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HabitTracker.Core;
 
-public sealed record Exercise(string Id, string Name, string Muscle, string Equipment);
-public sealed record Routine(string Id, string Name, string Description, string[] ExerciseIds);
+public sealed record Exercise(string Id, string Name, string Muscle, string Equipment)
+{
+    public override string ToString() => Name;
+}
+public sealed record Routine(string Id, string Name, string Description, string[] ExerciseIds)
+{
+    public override string ToString() => Name;
+}
 
 public static class TrainingCatalog
 {
