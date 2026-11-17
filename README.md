@@ -12,7 +12,7 @@
 ## Why I built it
 
 At the gym, I think in plates: **45 lb + 25 lb + 10 lb on each side**. Recording only “205 lb” is realllyyyyy annoying(calculating the weights after a Squart PR attempting?come on). HabitTracker keeps the bar weight, ordered left and right plate stacks, repetitions, effort, and notes together in every set.
-
+And another reason is i hate over-complex app with diet logging or gym lessons.All i want is purity.
 ```text
 45 lb bar + (45 + 25 + 10) left + (45 + 25 + 10) right = 205 lb
 ```
