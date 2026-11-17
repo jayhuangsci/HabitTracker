@@ -1,0 +1,43 @@
+name: OpenSilver mobile
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  browser:
+    name: Publish browser preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet workload install wasm-tools --skip-manifest-update
+      - run: dotnet publish mobile/HabitTracker.Mobile.Browser -c Release -o artifacts/mobile-browser --nologo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FORM-mobile-browser
+          path: artifacts/mobile-browser/wwwroot
+  android:
+    name: Build standalone Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: microsoft
+          java-version: '17'
+      - run: dotnet workload install maui-android --skip-manifest-update
+      - run: dotnet build mobile/HabitTracker.Mobile.MauiHybrid -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_HOME" -p:JavaSdkDirectory="$JAVA_HOME" -p:AcceptAndroidSdkLicenses=True --nologo
+      - run: dotnet build mobile/HabitTracker.Mobile.MauiHybrid -f net10.0-android -c Debug -p:AndroidSdkDirectory="$ANDROID_HOME" -p:JavaSdkDirectory="$JAVA_HOME" --nologo
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FORM-android-debug
+          path: mobile/HabitTracker.Mobile.MauiHybrid/bin/Debug/net10.0-android/*-Signed.apk
