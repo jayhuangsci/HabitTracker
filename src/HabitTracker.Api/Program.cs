@@ -10,6 +10,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+var mobileOrigins = builder.Configuration.GetSection("MobileClients:AllowedOrigins").Get<string[]>()
+    ?? ["http://localhost:5274", "http://127.0.0.1:5274"];
+builder.Services.AddCors(options => options.AddPolicy("MobilePreview", policy =>
+    policy.WithOrigins(mobileOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<WorkoutService>();
 var demo = builder.Configuration.GetValue<bool>("DemoMode");
@@ -25,6 +29,7 @@ if (sqlite.DataSource != ":memory:")
 builder.Services.AddDbContext<HabitTrackerDbContext>(options => options.UseSqlite(sqlite.ConnectionString));
 var app = builder.Build();
 app.UseExceptionHandler();
+app.UseCors("MobilePreview");
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

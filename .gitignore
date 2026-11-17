@@ -10,3 +10,10 @@ obj/
 .local/
 TestResults/
 artifacts/
+*.apk
+*.aab
+*.ipa
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
