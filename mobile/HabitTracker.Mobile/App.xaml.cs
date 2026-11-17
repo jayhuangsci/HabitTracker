@@ -1,22 +1,17 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
+using HabitTracker.Mobile.Core;
+using HabitTracker.Mobile.Services;
 
-namespace HabitTracker.Mobile
+namespace HabitTracker.Mobile;
+
+public sealed partial class App : Application
 {
-    public sealed partial class App : Application
+    public App()
     {
-        public App()
-        {
-            this.InitializeComponent();
-
-            // Enter construction logic here...
-
-            var mainPage = new MainPage();
-            this.RootVisual = mainPage;
-        }
+        InitializeComponent();
+        var device = MobilePlatform.Device ?? new BrowserDevice();
+        var clock = TimeProvider.System;
+        var workspace = new MobileWorkspace(new JournalFactory(device.Store, clock), device.Store, clock, device.ExportCsvAsync);
+        RootVisual = new MainPage(workspace, device);
     }
 }

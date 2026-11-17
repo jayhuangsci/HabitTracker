@@ -14,6 +14,7 @@ namespace HabitTracker.Mobile.MauiHybrid.Components
             await base.OnInitializedAsync();
 
             ArgumentNullException.ThrowIfNull(Runner);
+            HabitTracker.Mobile.Services.MobilePlatform.Device ??= new MauiDevice();
             await Runner.RunApplicationAsync<HabitTracker.Mobile.App>();
         }
     }

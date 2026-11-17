@@ -93,11 +93,12 @@ public sealed partial class MobileWorkspace : ObservableModel, IDisposable
         private set
         {
             if (!Set(ref _busy, value)) return;
-            foreach (var name in new[] { nameof(IsReady), nameof(CanEditDraft), nameof(CanEditRight), nameof(CanEditSession), nameof(HasPendingSave), nameof(LogButtonLabel), nameof(HasActiveWorkout), nameof(SessionSummary) }) Notify(name);
+            foreach (var name in new[] { nameof(IsReady), nameof(IsIdle), nameof(CanEditDraft), nameof(CanEditRight), nameof(CanEditSession), nameof(HasPendingSave), nameof(LogButtonLabel), nameof(HasActiveWorkout), nameof(SessionSummary) }) Notify(name);
             RefreshCommands();
         }
     }
     public bool IsReady => _initialized && !IsBusy;
+    public bool IsIdle => !IsBusy;
     public bool HasError { get => _error; private set => Set(ref _error, value); }
     public string Status { get => _status; private set => Set(ref _status, value); }
     public MobilePage Page => _page;
@@ -136,7 +137,7 @@ public sealed partial class MobileWorkspace : ObservableModel, IDisposable
     public bool HasNoWorkouts => !HasWorkouts;
     public bool HasHistory => History.Count > 0;
     public bool HasRecords => Records.Count > 0;
-    public string SessionSummary => _active == null ? "A fresh session. Make the first set count." : $"{_active.SetCount} sets saved · {_active.VolumeLabel} working volume";
+    public string SessionSummary => _active == null ? "A fresh session. Make the first set count." : $"{_active.SetCount} {(_active.SetCount == 1 ? "set" : "sets")} saved · {_active.VolumeLabel} working volume";
     public string LogButtonLabel => HasPendingSave ? "Retry pending save" : "＋  Log set";
     public string Sessions28 => Completed.Where(w => w.Date >= Today.AddDays(-27)).Count().ToString(CultureInfo.InvariantCulture);
     public string Volume28 => Compact(Completed.Where(w => w.Date >= Today.AddDays(-27)).Sum(w => w.VolumePounds));
@@ -145,7 +146,8 @@ public sealed partial class MobileWorkspace : ObservableModel, IDisposable
     public int WeeklySessions => Completed.Count(w => w.Date >= TrainingAnalytics.StartOfWeek(Today));
     public string GoalLabel => WeeklySessions + " / " + WeeklyGoal;
     public double GoalFraction => Math.Min(1, (double)WeeklySessions / WeeklyGoal);
-    public string GoalMessage => WeeklySessions >= WeeklyGoal ? "Weekly goal reached. Make room for recovery." : Math.Max(0, WeeklyGoal - WeeklySessions) + " more sessions to your weekly goal.";
+    public string GoalMessage => WeeklySessions >= WeeklyGoal ? "Weekly goal reached. Make room for recovery."
+        : (WeeklyGoal - WeeklySessions) + " more " + (WeeklyGoal - WeeklySessions == 1 ? "session" : "sessions") + " to your weekly goal.";
     private IEnumerable<WorkoutResponse> Completed => _workouts.Where(w => w.IsCompleted && w.Date <= Today);
     private IReadOnlyList<VolumePoint> _volumePoints = [];
     public string TimerLabel => TimeSpan.FromSeconds(_timer.RemainingSeconds).ToString(@"mm\:ss", CultureInfo.InvariantCulture);
@@ -182,6 +184,9 @@ public sealed partial class MobileWorkspace : ObservableModel, IDisposable
         {
             var rows = await candidate.Journal.ListAsync();
             var saved = await _state.ReadAsync(candidate.WorkspaceKey, JournalJsonContext.Default.WorkspaceSnapshot);
+            var nextPreferences = _preferences with { Mode = mode, ApiBaseUrl = mode == JournalMode.Connected ? ApiWorkoutJournal.NormalizeAddress(address).AbsoluteUri : _preferences.ApiBaseUrl, WeeklyGoal = WeeklyGoal };
+            // Keep the visible journal and its adapter together if persisting the new choice fails.
+            if (savePreference) await _state.SaveAsync("device/preferences/v1", nextPreferences, JournalJsonContext.Default.DevicePreferences);
             _draftSave?.Cancel();
             var old = _handle;
             _handle = candidate;
@@ -193,8 +198,7 @@ public sealed partial class MobileWorkspace : ObservableModel, IDisposable
             _active = rows.FirstOrDefault(w => w.Id == saved?.ActiveWorkoutId && !w.IsCompleted) ?? rows.FirstOrDefault(w => !w.IsCompleted);
             RecoverPendingSave();
             _initialized = true;
-            _preferences = _preferences with { Mode = mode, ApiBaseUrl = mode == JournalMode.Connected ? ApiWorkoutJournal.NormalizeAddress(address).AbsoluteUri : _preferences.ApiBaseUrl, WeeklyGoal = WeeklyGoal };
-            if (savePreference) await _state.SaveAsync("device/preferences/v1", _preferences, JournalJsonContext.Default.DevicePreferences);
+            _preferences = nextPreferences;
             NotifyDraft(); RebuildPresentation();
             Notify(nameof(SourceLabel)); Notify(nameof(SourceDetail)); Notify(nameof(IsDemo)); Notify(nameof(IsReady));
             Status = mode == JournalMode.Demo ? "Demo journal ready. Changes stay with your sample data." : mode == JournalMode.Local ? "Local journal ready. Your next set starts here." : "Connected to your journal service.";
@@ -222,13 +226,22 @@ public sealed partial class MobileWorkspace : ObservableModel, IDisposable
     private async Task RunAsync(Func<Task> action)
     {
         if (IsBusy || _disposed) return;
+        var previousStatus = Status;
+        var loadingStatus = _initialized ? "Updating your journal…" : "Opening your journal…";
         IsBusy = true; HasError = false;
-        try { await action(); }
+        Status = loadingStatus;
+        try
+        {
+            await action();
+            if (Status == loadingStatus) Status = previousStatus;
+        }
         catch (Exception ex) when (ex is IOException or HttpRequestException or TaskCanceledException or ArgumentException or InvalidOperationException or JsonException)
         {
             HasError = true;
             Status = ex is HttpRequestException or TaskCanceledException
-                ? "Could not reach the journal. Refresh to check an uncertain save, or retry the same pending set."
+                ? HasPendingSave
+                    ? "The save is awaiting confirmation. Refresh the journal or retry the same pending set."
+                    : "Could not reach the API. Your current journal has been kept. Check the address and connection, then try again."
                 : ex.Message;
             if (!_initialized) Navigate(MobilePage.Settings);
         }
@@ -336,6 +349,12 @@ public sealed partial class MobileWorkspace : ObservableModel, IDisposable
     {
         foreach (var command in new[] { RefreshCommand, ApplySettingsCommand, UseDemoCommand, LogSetCommand, FinishCommand, ExportCommand, TimerToggleCommand, TimerAddCommand, TimerResetCommand }) command?.Refresh();
         foreach (var command in new[] { AddLeftPlateCommand, AddRightPlateCommand, ClearPlatesCommand, SelectUnitCommand }) command?.Refresh();
+        foreach (var tile in SessionSets.Concat(History.SelectMany(w => w.Sets)).Concat(RecentWorkouts.SelectMany(w => w.Sets)))
+        {
+            if (tile.ReuseCommand is MobileCommand reuse) reuse.Refresh();
+            if (tile.RemoveCommand is MobileAsyncCommand remove) remove.Refresh();
+        }
+        foreach (var chip in LeftChips.Concat(RightChips)) if (chip.RemoveCommand is MobileCommand remove) remove.Refresh();
         RefreshHabitCommands();
     }
     private static void Replace<T>(ObservableCollection<T> target, IEnumerable<T> values) { target.Clear(); foreach (var value in values) target.Add(value); }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.WebView.Maui;
+using Microsoft.AspNetCore.Components.WebView.Maui;
 
 namespace HabitTracker.Mobile.MauiHybrid;
 
@@ -7,7 +7,7 @@ public class AndroidWebViewHandler : BlazorWebViewHandler
     protected override void ConnectHandler(global::Android.Webkit.WebView webView)
     {
         webView.Settings.SetSupportMultipleWindows(false);
-        webView.Settings.TextZoom = 100; // Set text zoom to 100% to avoid scaling issues
+        // Keep the WebView text scaling selected by the user.
 
         base.ConnectHandler(webView);
     }

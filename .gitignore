@@ -17,3 +17,5 @@ artifacts/
 *.jks
 *.p12
 *.mobileprovision
+mobile/**/wwwroot/libs/
+mobile/**/wwwroot/resources/

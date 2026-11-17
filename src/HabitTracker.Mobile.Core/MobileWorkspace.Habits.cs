@@ -126,5 +126,6 @@ public sealed partial class MobileWorkspace
     private void RefreshHabitCommands()
     {
         NewHabitCommand?.Refresh(); SaveHabitCommand?.Refresh(); DeleteHabitCommand?.Refresh(); ConfirmDeleteHabitCommand?.Refresh(); CancelDeleteHabitCommand?.Refresh(); LogHabitCommand?.Refresh();
+        foreach (var log in HabitLogs) log.RemoveCommand.Refresh();
     }
 }

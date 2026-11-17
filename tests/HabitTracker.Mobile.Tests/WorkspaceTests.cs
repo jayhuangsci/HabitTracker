@@ -46,6 +46,23 @@ public class WorkspaceTests
     }
 
     [Fact]
+    public async Task MirroredExpressionsStayEqualWhenSwitchingToIndependentSides()
+    {
+        using var workspace = Open(new MemoryJournalStore(), new ManualClock());
+        await workspace.InitializeAsync();
+        workspace.Left = "45+10";
+        Assert.Equal("45+10", workspace.Right);
+        Assert.Equal("155", workspace.TotalLoad);
+        workspace.Mirror = false;
+        workspace.Left = "45+25+10";
+        Assert.Equal("45+10", workspace.Right);
+        Assert.Equal("180", workspace.TotalLoad);
+        workspace.Mirror = true;
+        Assert.Equal(workspace.Left, workspace.Right);
+        Assert.Equal("205", workspace.TotalLoad);
+    }
+
+    [Fact]
     public async Task ChangingJournalModeKeepsPersonalDataAndTimerSeparate()
     {
         var store = new MemoryJournalStore(); var clock = new ManualClock();
@@ -82,6 +99,26 @@ public class WorkspaceTests
     }
 
     [Fact]
+    public async Task FailedModePreferenceWriteKeepsTheVisibleJournalAndItsAdapterTogether()
+    {
+        var store = new FailingPreferencesStore(new MemoryJournalStore());
+        using var workspace = Open(store, new ManualClock());
+        await workspace.InitializeAsync();
+        await workspace.LogSetCommand.ExecuteAsync();
+        store.FailWrites = true;
+        workspace.SelectedMode = JournalMode.Demo;
+        await workspace.ApplySettingsCommand.ExecuteAsync();
+        Assert.True(workspace.HasError);
+        Assert.Equal("LOCAL JOURNAL", workspace.SourceLabel);
+        Assert.Equal(205, Assert.Single(workspace.SessionSets).Set.TotalWeight);
+        store.FailWrites = false;
+        await workspace.RefreshCommand.ExecuteAsync();
+        Assert.False(workspace.HasError, workspace.Status);
+        Assert.Equal("LOCAL JOURNAL", workspace.SourceLabel);
+        Assert.Equal(205, Assert.Single(workspace.SessionSets).Set.TotalWeight);
+    }
+
+    [Fact]
     public async Task AnAmbiguousCommittedSaveIsRecoveredWithoutAddingADuplicate()
     {
         var store = new CommitThenThrowStore(new MemoryJournalStore()); var clock = new ManualClock();
@@ -100,6 +137,15 @@ public class WorkspaceTests
         Assert.False(restored.HasError, restored.Status);
         Assert.False(restored.HasPendingSave);
         Assert.Equal(205, Assert.Single(restored.SessionSets).Set.TotalWeight);
+    }
+
+    private sealed class FailingPreferencesStore(IJournalStore inner) : IJournalStore
+    {
+        public bool FailWrites { get; set; }
+        public Task<StoredDocument?> ReadAsync(string key, CancellationToken ct = default) => inner.ReadAsync(key, ct);
+        public Task<bool> TryWriteAsync(string key, long expectedVersion, string json, CancellationToken ct = default) =>
+            FailWrites && key == "device/preferences/v1" ? throw new IOException("Simulated full device storage.")
+                : inner.TryWriteAsync(key, expectedVersion, json, ct);
     }
 
     private sealed class FailingConnectedFactory(IJournalFactory inner) : IJournalFactory

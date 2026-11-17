@@ -1,13 +1,40 @@
-﻿<Page x:Class="HabitTracker.Mobile.MainPage"
-      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-      xmlns:local="clr-namespace:HabitTracker.Mobile"
-      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-      mc:Ignorable="d"
-      Foreground="Black">
-
-    <Grid Background="White">
-        <TextBlock Text="Hello, World!" FontSize="23" Margin="32,32,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"/>
+<Page x:Class="HabitTracker.Mobile.MainPage" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:HabitTracker.Mobile.Views" Foreground="#193729" FontFamily="Segoe UI">
+    <Grid Background="#F5F7F2">
+        <Grid MaxWidth="640">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <Border Background="#FDFEF9" BorderBrush="#E2E8D9" BorderThickness="0,0,0,1" Padding="20,12">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="▰" Foreground="#9AC94E" FontSize="24" Margin="0,0,7,0" /><TextBlock Text="FORM" FontSize="23" FontWeight="Bold" /></StackPanel><TextBlock Text="{Binding SourceLabel}" Foreground="#758765" FontSize="9" Margin="1,4,0,0" /></StackPanel>
+                    <Button Grid.Column="1" Content="⋯" Command="{Binding NavigateCommand}" CommandParameter="Settings" Background="#ECF2E2" Padding="12,1" MinWidth="44" FontSize="26" VerticalAlignment="Center" AutomationProperties.Name="Settings" />
+                </Grid>
+            </Border>
+            <ScrollViewer x:Name="ContentScroll" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" BorderThickness="0" Background="Transparent">
+                <Grid Margin="20,22,20,26" IsEnabled="{Binding IsIdle}">
+                    <views:HomeView Visibility="{Binding IsHome, Converter={StaticResource Visible}}" />
+                    <views:WorkoutView x:Name="WorkoutContent" Visibility="{Binding IsWorkout, Converter={StaticResource Visible}}" />
+                    <views:HistoryView Visibility="{Binding IsHistory, Converter={StaticResource Visible}}" />
+                    <views:ProgressView Visibility="{Binding IsProgress, Converter={StaticResource Visible}}" />
+                    <views:SettingsView Visibility="{Binding IsSettings, Converter={StaticResource Visible}}" />
+                    <views:HabitsView Visibility="{Binding IsHabits, Converter={StaticResource Visible}}" />
+                </Grid>
+            </ScrollViewer>
+            <Border Grid.Row="2" Background="{Binding HasError, Converter={StaticResource BoolBrush}, ConverterParameter=#FFF0D9|#F8FAF3}" BorderBrush="#E2E8D9" BorderThickness="0,1,0,0" Padding="16,9">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="{Binding Status}" FontSize="10" Foreground="#607250" TextWrapping="Wrap" /><TextBlock x:Name="BootFailure" Foreground="#9A5B27" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" /></StackPanel><Button Grid.Column="1" Content="↻" Command="{Binding RefreshCommand}" Style="{StaticResource Quiet}" MinWidth="44" FontSize="20" Padding="8,0" Margin="8,-5,0,-5" AutomationProperties.Name="Refresh journal" /></Grid>
+            </Border>
+            <Border Grid.Row="3" Background="#FDFEF9" Padding="16,10" BorderBrush="#E2E8D9" BorderThickness="0,1,0,0" Visibility="{Binding IsWorkout, Converter={StaticResource Visible}}">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions><Button Content="{Binding LogButtonLabel}" Command="{Binding LogSetCommand}" Style="{StaticResource Primary}" MinHeight="50" AutomationProperties.Name="Log set" /><Button Grid.Column="2" Content="Finish ✓" Command="{Binding FinishCommand}" Background="White" BorderBrush="#CCD9BE" BorderThickness="1" MinHeight="50" AutomationProperties.Name="Finish workout" /></Grid>
+            </Border>
+            <Border Grid.Row="4" Background="White" Padding="8,6,8,10" BorderBrush="#E2E8D9" BorderThickness="0,1,0,0">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Button Command="{Binding NavigateCommand}" CommandParameter="Home" Background="{Binding IsHome, Converter={StaticResource BoolBrush}, ConverterParameter=#EDF3E2|#FFFFFF}" Padding="4,7" AutomationProperties.Name="Home"><StackPanel><TextBlock Text="⌂" FontSize="23" TextAlignment="Center" /><TextBlock Text="Home" FontSize="10" TextAlignment="Center" Margin="0,3,0,0" /></StackPanel></Button>
+                    <Button Grid.Column="1" Command="{Binding NavigateCommand}" CommandParameter="Workout" Background="{Binding IsWorkout, Converter={StaticResource BoolBrush}, ConverterParameter=#EDF3E2|#FFFFFF}" Padding="4,7" AutomationProperties.Name="Workout"><StackPanel><TextBlock Text="＋" FontSize="23" TextAlignment="Center" /><TextBlock Text="Workout" FontSize="10" TextAlignment="Center" Margin="0,3,0,0" /></StackPanel></Button>
+                    <Button Grid.Column="2" Command="{Binding NavigateCommand}" CommandParameter="History" Background="{Binding IsHistory, Converter={StaticResource BoolBrush}, ConverterParameter=#EDF3E2|#FFFFFF}" Padding="4,7" AutomationProperties.Name="History"><StackPanel><TextBlock Text="≡" FontSize="23" TextAlignment="Center" /><TextBlock Text="History" FontSize="10" TextAlignment="Center" Margin="0,3,0,0" /></StackPanel></Button>
+                    <Button Grid.Column="3" Command="{Binding NavigateCommand}" CommandParameter="Progress" Background="{Binding IsProgress, Converter={StaticResource BoolBrush}, ConverterParameter=#EDF3E2|#FFFFFF}" Padding="4,7" AutomationProperties.Name="Progress"><StackPanel><TextBlock Text="↗" FontSize="23" TextAlignment="Center" /><TextBlock Text="Progress" FontSize="10" TextAlignment="Center" Margin="0,3,0,0" /></StackPanel></Button>
+                </Grid>
+            </Border>
+        </Grid>
+        <Grid Background="#99193729" Visibility="{Binding HasDeleteHabitConfirmation, Converter={StaticResource Visible}}">
+            <Border Style="{StaticResource Card}" MaxWidth="340" Margin="20" VerticalAlignment="Center"><StackPanel><TextBlock Text="Delete this habit?" Style="{StaticResource Heading}" /><TextBlock Text="{Binding DeleteHabitPrompt}" Style="{StaticResource Caption}" Margin="0,12,0,20" /><Button Content="Delete habit and records" Command="{Binding ConfirmDeleteHabitCommand}" Background="#8A572C" Foreground="White" /><Button Content="Keep habit" Command="{Binding CancelDeleteHabitCommand}" Background="#EDF2E4" Margin="0,10,0,0" /></StackPanel></Border>
+        </Grid>
     </Grid>
 </Page>

@@ -24,9 +24,26 @@ public sealed partial class MobileWorkspace
     public string WorkoutName { get => _draft.Name; set => ChangeDraft(_draft with { Name = value ?? "" }); }
     public DateTime? WorkoutDate { get => _draft.Date.ToDateTime(TimeOnly.MinValue); set { if (value.HasValue) ChangeDraft(_draft with { Date = DateOnly.FromDateTime(value.Value) }); } }
     public string Bar { get => _draft.Bar; set => ChangeDraft(_draft with { Bar = value ?? "" }); }
-    public string Left { get => _draft.Left; set => ChangeDraft(_draft with { Left = value ?? "" }); }
+    public string Left
+    {
+        get => _draft.Left;
+        set
+        {
+            var expression = value ?? "";
+            ChangeDraft(_draft with { Left = expression, Right = Mirror ? expression : _draft.Right });
+            if (Mirror) Notify(nameof(Right));
+        }
+    }
     public string Right { get => _draft.Right; set => ChangeDraft(_draft with { Right = value ?? "" }); }
-    public bool Mirror { get => _draft.Mirror; set { ChangeDraft(_draft with { Mirror = value }); Notify(nameof(CanEditRight)); } }
+    public bool Mirror
+    {
+        get => _draft.Mirror;
+        set
+        {
+            ChangeDraft(_draft with { Mirror = value, Right = value ? Left : _draft.Right });
+            Notify(nameof(Right)); Notify(nameof(CanEditRight));
+        }
+    }
     public string Reps { get => _draft.Reps; set => ChangeDraft(_draft with { Reps = value ?? "" }); }
     public string Rpe { get => _draft.Rpe; set => ChangeDraft(_draft with { Rpe = value ?? "" }); }
     public string SetNotes { get => _draft.Notes; set => ChangeDraft(_draft with { Notes = value ?? "" }); }

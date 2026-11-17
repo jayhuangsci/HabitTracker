@@ -38,13 +38,14 @@ public sealed class WorkoutTile : ObservableModel
     public WorkoutResponse Workout { get; }
     public string Name => Workout.Name;
     public string DateLabel => Workout.Date.ToString("ddd, MMM d");
-    public string Detail => Workout.SetCount + " sets · " + Workout.VolumeLabel;
+    public string Detail => Workout.SetCount + (Workout.SetCount == 1 ? " set · " : " sets · ") + Workout.VolumeLabel;
     public string Status => Workout.StatusLabel;
     public bool CanResume => !Workout.IsCompleted;
     public IReadOnlyList<SetTile> Sets { get; }
     public ICommand ToggleCommand { get; }
     public ICommand ResumeCommand { get; }
-    public bool Expanded { get => _expanded; private set => Set(ref _expanded, value); }
+    public IReadOnlyList<SetTile> VisibleSets => Expanded ? Sets : [];
+    public bool Expanded { get => _expanded; private set { if (Set(ref _expanded, value)) Notify(nameof(VisibleSets)); } }
     public WorkoutTile(WorkoutResponse workout, IReadOnlyList<SetTile> sets, Action resume)
     {
         Workout = workout; Sets = sets;
