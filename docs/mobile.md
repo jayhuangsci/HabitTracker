@@ -101,12 +101,12 @@ For multiple attached devices, select the intended device in the IDE or set the 
 Install a supported Xcode version, complete its setup, and install the .NET 10 MAUI iOS workload. Use the Xcode version required by your installed workload; see the [official iOS requirements](https://learn.microsoft.com/dotnet/maui/ios/cli).
 
 ```sh
-dotnet workload install maui-ios
+dotnet workload install maui
 dotnet build mobile/HabitTracker.Mobile.MauiHybrid -f net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64
 dotnet build mobile/HabitTracker.Mobile.MauiHybrid -t:Run -f net10.0-ios -c Debug -p:RuntimeIdentifier=iossimulator-arm64
 ```
 
-Use `iossimulator-x64` on an Intel Mac. The project includes the iOS target when built on macOS; the Android target remains available there too. Minimum iOS version is **15.0**. A physical iPhone build uses `ios-arm64` and requires an Apple signing identity and provisioning profile configured in the IDE. Keep signing secrets out of the repository.
+Use `iossimulator-x64` on an Intel Mac. Install the full MAUI workload on macOS because restore evaluates the launcher's declared Android and iOS targets, even when `-f` selects just the iOS build. Minimum iOS version is **15.0**. A physical iPhone build uses `ios-arm64` and requires an Apple signing identity and provisioning profile configured in the IDE. Keep signing secrets out of the repository.
 
 iOS uses `TrimMode=copy` to preserve reflection-based XAML bindings while allowing Apple's required linker pipeline to run. Safe-area handling, native file sharing and resume/background callbacks are configured, but they still require real iOS validation. App Store packaging and distribution are outside this development build.
 
