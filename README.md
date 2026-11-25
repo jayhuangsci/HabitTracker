@@ -2,12 +2,11 @@
 
 **A C# strength journal that remembers the plates, not just the total.**
 
-[![Build and test](https://github.com/jayhuangsci/HabitTracker/actions/workflows/ci.yml/badge.svg)]
+[![Build and test](https://github.com/jayhuangsci/HabitTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/jayhuangsci/HabitTracker/actions/workflows/ci.yml)
 ![Project age](https://img.shields.io/date/1777390533?label=Project%20age&color=193729&cacheSeconds=86400 "Repository created April 28, 2026")
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
 ![Desktop](https://img.shields.io/badge/Desktop-WPF-24523C)
 ![Storage](https://img.shields.io/badge/Storage-SQLite-517A4C)
-(https://github.com/jayhuangsci/HabitTracker/actions/workflows/ci.yml)
 
 ![FORM training overview with sample workout history](docs/images/overview.png)
 
