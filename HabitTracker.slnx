@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/HabitTracker.Mobile.Core/HabitTracker.Mobile.Core.csproj" />
     <Project Path="src/HabitTracker.Core/HabitTracker.Core.csproj" />
     <Project Path="src/HabitTracker.Api/HabitTracker.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/HabitTracker.Mobile.Tests/HabitTracker.Mobile.Tests.csproj" />
     <Project Path="tests/HabitTracker.Desktop.Tests/HabitTracker.Desktop.Tests.csproj" />
     <Project Path="tests/HabitTracker.Api.Tests/HabitTracker.Api.Tests.csproj" />
     <Project Path="tests/HabitTracker.Core.Tests/HabitTracker.Core.Tests.csproj" />

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#193729" />
+    <meta name="description" content="FORM — HabitTracker. A strength journal that remembers every plate." />
+    <title>FORM — HabitTracker</title>
+    <base href="/" />
+    <link rel="icon" href="data:," />
+    <style>html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#F5F7F2; }
+body.form-mobile { font-family:Segoe UI,system-ui,sans-serif; }
+#opensilver-root { position:relative; width:100%; height:var(--form-height,100%); overflow:hidden; }
+#boot-status { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#193729; background:#F5F7F2; }
+#boot-status strong { font-size:30px; letter-spacing:1px; }
+#boot-status span { font-size:13px; color:#68795E; }
+#boot-status i { display:block; width:48px; height:5px; background:#D2F580; border-radius:4px; }
+</style>
+</head>
+<body class="form-mobile">
+    <div id="app"><div id="boot-status"><strong>▰ FORM</strong><i></i><span>Opening your strength journal…</span></div></div>
+    <div id="opensilver-root"></div>
+    <div id="blazor-error-ui" style="display:none">The journal could not start. <a href="" class="reload">Reload</a></div>
+    <script src="libs/OpenSilver.js"></script>
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>

@@ -43,6 +43,7 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet test tests/HabitTracker.Core.Tests -c Release --logger trx --results-directory TestResults
       - run: dotnet test tests/HabitTracker.Api.Tests -c Release --logger trx --results-directory TestResults
+      - run: dotnet test tests/HabitTracker.Mobile.Tests -c Release --logger trx --results-directory TestResults
       - uses: actions/upload-artifact@v4
         if: always()
         with:

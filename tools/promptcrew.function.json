@@ -1,0 +1,35 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "promptcrew",
+      "description": "Record and retrieve project-scoped visible prompts, employee roles, task branches and versioned outputs in PromptCrew. Dispatch arguments through PromptCrew.Tools; credentials come from the host, never tool arguments. Body schemas and required IDs are documented in docs/promptcrew-api.md and the running OpenAPI endpoint.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation": { "type": "string", "enum": ["session", "list_projects", "get_project", "create_project", "update_project", "list_employees", "get_employee", "create_employee", "update_employee", "list_templates", "list_chains", "get_chain", "create_chain", "update_chain", "save_round", "save_result", "get_round", "get_by_request", "get_context", "search_rounds", "get_graph", "compare_rounds"] },
+          "projectId": { "type": "string", "format": "uuid" },
+          "chainId": { "type": "string", "format": "uuid" },
+          "employeeId": { "type": "string", "format": "uuid" },
+          "roundId": { "type": "string", "format": "uuid", "description": "For get_context: the chosen parent; omit for a new root." },
+          "otherRoundId": { "type": "string", "format": "uuid" },
+          "leftVersion": { "type": "integer", "minimum": 1, "description": "Optional output version of roundId for compare_rounds; omitted selects latest." },
+          "rightVersion": { "type": "integer", "minimum": 1, "description": "Optional output version of otherRoundId. Use the same round IDs to compare its output history." },
+          "clientRequestId": { "type": "string", "format": "uuid", "description": "Only for get_by_request. For writes put clientRequestId inside body." },
+          "referenceIds": { "type": "array", "items": { "type": "string", "format": "uuid" }, "maxItems": 24 },
+          "query": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" }, "employeeId": { "type": "string", "format": "uuid" },
+              "chainId": { "type": "string", "format": "uuid" }, "tag": { "type": "string" },
+              "status": { "type": "string", "enum": ["PendingOutput", "Completed", "Failed"] },
+              "skip": { "type": "integer", "minimum": 0 }, "take": { "type": "integer", "minimum": 1, "maximum": 200 }
+            }, "additionalProperties": false
+          },
+          "body": { "type": "object", "description": "The exact API input. save_round and save_result require a fresh UUID clientRequestId, retained with this entire request for retries. Updates and save_result require expectedVersion." }
+        },
+        "required": ["operation"], "additionalProperties": false
+      }
+    }
+  }
+]
