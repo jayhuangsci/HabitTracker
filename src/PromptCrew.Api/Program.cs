@@ -38,6 +38,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<CrewDbContext>();
     await db.Database.MigrateAsync();
     _ = scope.ServiceProvider.GetRequiredService<AdminCredential>();
+    if (scope.ServiceProvider.GetRequiredService<StorageSettings>().Demo)
+        await DemoSeeder.Seed(db, scope.ServiceProvider.GetRequiredService<CrewService>());
 }
 app.MapGet("/health", async (CrewDbContext db, CancellationToken ct) =>
     await db.Database.CanConnectAsync(ct) ? Results.Ok(new { status = "healthy", product = "PromptCrew" }) : Results.StatusCode(503));
@@ -78,7 +80,7 @@ api.MapPost("/projects/{projectId:guid}/rounds/{roundId:guid}/results", async (G
     return Results.Json(saved, statusCode: saved.Replayed ? 200 : 201);
 });
 api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/graph", (Guid projectId, Guid chainId, HttpContext h, CrewService s, CancellationToken ct) => s.Graph(projectId, chainId, h.Actor(), ct));
-api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/context", (Guid projectId, Guid chainId, Guid? roundId, Guid employeeId, HttpContext h, CrewService s, CancellationToken ct) => s.Context(projectId, chainId, roundId, employeeId, h.Actor(), ct));
+api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/context", (Guid projectId, Guid chainId, Guid? roundId, Guid employeeId, [Microsoft.AspNetCore.Mvc.FromQuery] Guid[]? referenceId, HttpContext h, CrewService s, CancellationToken ct) => s.Context(projectId, chainId, roundId, employeeId, h.Actor(), ct, referenceId));
 api.MapGet("/projects/{projectId:guid}/compare", (Guid projectId, Guid left, Guid right, HttpContext h, CrewService s, CancellationToken ct) => s.Compare(projectId, left, right, h.Actor(), ct));
 app.Run();
 

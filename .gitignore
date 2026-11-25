@@ -19,3 +19,6 @@ artifacts/
 *.mobileprovision
 mobile/**/wwwroot/libs/
 mobile/**/wwwroot/resources/
+*.key
+.env
+.env.*

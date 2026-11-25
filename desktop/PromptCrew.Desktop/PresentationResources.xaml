@@ -1,0 +1,9 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:core="clr-namespace:PromptCrew.Core;assembly=PromptCrew.Core">
+  <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="Themes/FlatTheme.xaml"/></ResourceDictionary.MergedDictionaries>
+  <DataTemplate DataType="{x:Type core:ProjectDto}"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+  <DataTemplate DataType="{x:Type core:EmployeeDto}"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+  <DataTemplate DataType="{x:Type core:ChainDto}"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+  <DataTemplate DataType="{x:Type core:RoleTemplate}"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+  <DataTemplate DataType="{x:Type core:RoundDto}"><TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis"/></DataTemplate>
+  <DataTemplate DataType="{x:Type core:ResultDto}"><TextBlock Text="{Binding Version,StringFormat=结果版本 v{0}}"/></DataTemplate>
+</ResourceDictionary>

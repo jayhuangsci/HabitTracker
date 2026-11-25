@@ -155,7 +155,7 @@ public sealed partial class CrewService
                 x.Input.Length > 100 ? x.Input[..100] + "…" : x.Input, x.References.Select(r => r.ReferencedRoundId).ToArray(), x.RevisesRoundId);
         }).ToArray());
     }
-    public async Task<ContextDto> Context(Guid projectId, Guid chainId, Guid? roundId, Guid employeeId, AccessScope actor, CancellationToken ct)
+    public async Task<ContextDto> Context(Guid projectId, Guid chainId, Guid? roundId, Guid employeeId, AccessScope actor, CancellationToken ct, Guid[]? referenceIds = null)
     {
         var project = await Project(projectId, actor, ct); var chain = await Chain(projectId, chainId, ct);
         var employee = await Employee(projectId, employeeId, ct);
@@ -170,8 +170,12 @@ public sealed partial class CrewService
             path.Add(Map(row)); cursor = row.ParentRoundId;
         }
         path.Reverse();
-        var ids = path.SelectMany(x => x.ReferenceRoundIds).Distinct().Except(visited).ToArray();
+        referenceIds ??= [];
+        if (referenceIds.Length > 24 || referenceIds.Any(x => x == Guid.Empty))
+            throw new CrewException(400, "invalid_references", "本轮上下文最多引用 24 个有效轮次 ID。");
+        var ids = path.SelectMany(x => x.ReferenceRoundIds).Concat(referenceIds).Distinct().Except(visited).ToArray();
         var references = (await RoundQuery.AsNoTracking().Where(x => x.ProjectId == projectId && ids.Contains(x.Id)).ToArrayAsync(ct)).Select(Map).ToArray();
+        if (references.Length != ids.Length) throw Missing("当前项目的引用成果");
         var text = new StringBuilder().AppendLine("# 项目背景").AppendLine(project.Name).AppendLine(project.Goal)
             .AppendLine(project.Background).AppendLine(project.Constraints).AppendLine("\n# 当前员工职责")
             .AppendLine(employee.Role).AppendLine(employee.Responsibilities).AppendLine(employee.BasePrompt)

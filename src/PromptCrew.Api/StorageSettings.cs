@@ -33,7 +33,7 @@ public sealed record StorageSettings(string DirectoryPath, bool Demo)
             }
             token = File.ReadAllText(path).Trim();
         }
-        if (token.Length < 32) throw new InvalidOperationException("管理员密钥至少需要 32 个字符。");
+        if (token.Length is < 32 or > 256 || token.Any(char.IsControl)) throw new InvalidOperationException("管理员密钥应为 32–256 个非控制字符。");
         return new(token);
     }
 }
