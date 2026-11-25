@@ -2,7 +2,7 @@
 
 ## 桌面体验
 
-运行 `./scripts/Start-PromptCrew.ps1 -Demo`。该命令只使用 `.local/promptcrew-demo`，首次为空时才加入示例，不会每次重复生成记录。
+双击仓库根目录的 `Start-PromptCrew-Demo.cmd`，或在 PowerShell 中运行 `.\Start-PromptCrew-Demo.cmd`。入口使用 Windows 自带的 PowerShell 5.1。启动器只使用 `.local/promptcrew-demo`，首次为空时才加入示例，不会每次重复生成记录。
 
 1. 项目“星港 · 游戏演示”包含玩法设计师、程序员、美术设计师、数值策划四名员工。
 2. 展开“战斗系统原型”：01 设计 → 02 程序 → 03 数值 → 04 程序修正，另有 01 → 05 即时制 → 06 美术。

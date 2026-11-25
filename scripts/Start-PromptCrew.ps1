@@ -38,7 +38,7 @@ try {
     $env:PROMPTCREW_API_URL = $baseUrl
     $env:PROMPTCREW_KEY_FILE = $env:PromptCrew__AdminKeyFile
     $env:PROMPTCREW_SETTINGS_FILE = Join-Path $dataDir 'desktop-settings.json'
-    Write-Host "PromptCrew ready: $baseUrl · data: $dataDir"
+    Write-Host "PromptCrew ready: $baseUrl | data: $dataDir"
     if ($CaptureDirectory) {
         $captureDir = [IO.Path]::GetFullPath($CaptureDirectory); New-Item -ItemType Directory -Path $captureDir -Force | Out-Null
         foreach ($tab in @(0,1,2,3,4)) {

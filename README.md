@@ -17,12 +17,14 @@
 
 ## 三分钟体验
 
-需要 **Windows 10/11、.NET 10 SDK、PowerShell 7**。
+需要 **Windows 10/11 和 .NET 10 SDK**。启动器兼容系统自带的 Windows PowerShell 5.1，无需另外安装 PowerShell 7。
+
+已有源码时，直接双击根目录的 **`Start-PromptCrew-Demo.cmd`**。正式工作区使用 **`Start-PromptCrew.cmd`**。
 
 ```powershell
 git clone --branch codex/promptcrew https://github.com/jayhuangsci/HabitTracker.git
 cd HabitTracker
-./scripts/Start-PromptCrew.ps1 -Demo
+.\Start-PromptCrew-Demo.cmd
 ```
 
 演示创建“星港”游戏项目、四名员工和六轮记录：
@@ -46,12 +48,20 @@ flowchart TD
 自己的项目使用：
 
 ```powershell
-./scripts/Start-PromptCrew.ps1
+.\Start-PromptCrew.cmd
 # 默认端口占用时：
-./scripts/Start-PromptCrew.ps1 -Port 5285
+.\Start-PromptCrew.cmd -Port 5285
 ```
 
 正式工作区首次为空，可用界面的“＋”创建项目、员工与任务链；员工编辑器提供四个角色模板。关闭桌面会停止该启动器创建的 API。已有服务不会被替换。
+
+在 Windows PowerShell 中也可直接运行（将路径替换为自己的仓库目录）：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "C:\Users\HOME\OneDrive\Documents\ChatGPT\habittracker\scripts\Start-PromptCrew.ps1" -Demo
+```
+
+`pwsh` 是 PowerShell 7 的命令；未安装或未加入 PATH 时，使用上面的系统命令或双击入口。Agent 验收、打包等维护脚本仍按相应说明使用 PowerShell 7。
 
 ## 已实现的功能
 
