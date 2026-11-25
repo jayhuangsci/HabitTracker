@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PromptCrew.Core/PromptCrew.Core.csproj" />
+    <Project Path="src/PromptCrew.Api/PromptCrew.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PromptCrew.Api.Tests/PromptCrew.Api.Tests.csproj" />
+  </Folder>
+</Solution>
