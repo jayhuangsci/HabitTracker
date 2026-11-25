@@ -15,6 +15,17 @@
 
 本仓库由 **HabitTracker / FORM** 演进而来，复用 C# MVVM 与界面基础。原训练应用、OpenSilver 客户端和训练数据继续保留，使用说明见[原业务文档](docs/legacy-fitness.md)。PromptCrew 使用独立数据库。
 
+## 直接运行 Windows 版
+
+从 [GitHub 构建页面](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml)的成功构建下载 `PromptCrew-win-x64`，解压完整 ZIP 后双击：
+
+- **`PromptCrew-Demo.exe`**：带四名员工和战斗系统分支的游戏演示。
+- **`PromptCrew.exe`**：自己的正式工作区。
+
+自包含包无需安装 .NET、SDK 或 PowerShell 7。exe 会自动启动本地服务和桌面，关闭界面后停止它创建的服务。请保留同目录的 `api`、`desktop`、`tools` 文件夹。
+
+源码打包后，直接可运行的目录为 `artifacts/PromptCrew-win-x64/`，压缩包为 `artifacts/PromptCrew-win-x64.zip`。数据保存在用户目录中，更新程序不会覆盖业务记录。默认端口占用时自动选择空闲端口，实际连接信息保存到数据目录的 `connection.json`。
+
 ## 三分钟体验
 
 需要 **Windows 10/11 和 .NET 10 SDK**。启动器兼容系统自带的 Windows PowerShell 5.1，无需另外安装 PowerShell 7。
@@ -140,6 +151,7 @@ erDiagram
 | `PromptCrew.Api` | Minimal API、项目权限、EF Core 迁移、事务性保存、幂等与并发处理 |
 | `PromptCrew.Client` | WPF 和工具共享的类型化 HTTP 客户端与错误处理 |
 | `PromptCrew.Desktop` | WPF/MVVM、树状轮次、草稿恢复；链接复用原命令和基础主题 |
+| `PromptCrew.Launcher` | 双击 exe 启动、空闲端口选择、本地服务认证检查与退出清理 |
 | `PromptCrew.Tools` | 将 JSON 函数参数映射为真实 HTTP 调用；宿主负责提供密钥 |
 
 具体复用决策、并发与时间处理见[实现说明](docs/promptcrew-architecture.md)。
@@ -164,7 +176,8 @@ dotnet test PromptCrew.slnx -c Release
 
 - **23 个 API 集成测试 + 1 个 WPF 工作流测试**：真实 SQLite，覆盖项目隔离、链路合法性、分支引用、重复请求、并发冲突、角色快照、版本保留、停止服务后的恢复，以及响应丢失后重试。
 - Agent 演示通过真实 CLI → HTTP → SQLite 创建四名员工、六轮交接与分支，并检查重放、冲突和上下文边界。
-- 打包生成 `artifacts/PromptCrew-win-x64.zip`；解压后用 PowerShell 7 运行 `./Run.ps1 -Demo`。自包含包无需安装 .NET。
+- 打包生成 `artifacts/PromptCrew-win-x64.zip`；解压后双击 `PromptCrew-Demo.exe` 或 `PromptCrew.exe`。自包含包无需安装 .NET。
+- `./scripts/Test-PromptCrewPackage.ps1 -PackageDirectory artifacts/PromptCrew-win-x64` 验证真实 exe 启动、端口避让、桌面渲染、服务退出与缺失文件的错误提示。
 - [交付记录及各批限制](docs/promptcrew-delivery.md)；GitHub Actions 同时检查新产品与保留的原业务。
 
 当前按单机使用设计。搜索使用 SQLite 正文过滤；对比保留共同前后文后显示中段替换，不保证最短差异。祖先链上限 256 轮、上下文上限 500,000 字符、每页最多 200 条；长任务可拆链并引用成果。API Key 只有项目范围，暂未细分只读/写入权限；本地数据库、草稿和密钥文件依赖操作系统权限保护，不提供应用级加密。

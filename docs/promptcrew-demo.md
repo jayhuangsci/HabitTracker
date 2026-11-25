@@ -2,6 +2,8 @@
 
 ## 桌面体验
 
+便携版解压完整 ZIP 后直接双击 `PromptCrew-Demo.exe`，不需要命令行或开发环境。自己的项目使用 `PromptCrew.exe`。两者的数据目录分别为 `%LOCALAPPDATA%/PromptCrew/demo` 和 `personal`。
+
 双击仓库根目录的 `Start-PromptCrew-Demo.cmd`，或在 PowerShell 中运行 `.\Start-PromptCrew-Demo.cmd`。入口使用 Windows 自带的 PowerShell 5.1。启动器只使用 `.local/promptcrew-demo`，首次为空时才加入示例，不会每次重复生成记录。
 
 1. 项目“星港 · 游戏演示”包含玩法设计师、程序员、美术设计师、数值策划四名员工。

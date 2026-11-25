@@ -4,7 +4,7 @@
 
 ## 本地宿主配置
 
-1. 通过 `./scripts/Start-PromptCrew.ps1` 启动桌面与 API。
+1. 双击便携版 `PromptCrew.exe`，或通过源码启动脚本启动桌面与 API。
 2. 在“API Key”界面选择项目，签发 Agent 密钥并保存到仓库外。管理员密钥可用于初始配置，日常 Agent 使用项目密钥。
 3. 在运行 Agent 的同一宿主环境设置以下变量。桌面启动器子进程中的变量不会自动传播到另一个终端。
 4. 注册函数或让有 shell 权限的 Agent 调用命令。
@@ -87,6 +87,8 @@ sequenceDiagram
 远程 API 可以用 `dotnet publish src/PromptCrew.Api -c Release -o <目录>` 部署，配置 `PromptCrew__DataDirectory`、`PromptCrew__AdminKeyFile` 和内部 `ASPNETCORE_URLS`。默认服务仅绑定本机。此仓库没有创建公开地址或自动配置隧道；云端网络与 HTTPS 部署需要宿主提供。
 
 密钥属于持久访问凭据，保存在受控文件或宿主凭据存储中，勿发送给模型作为提示词内容。项目密钥可在桌面撤销；管理员密钥轮换需要更新文件并重启服务。数据库和本机草稿为明文业务数据，依赖操作系统访问权限。
+
+便携版默认尝试 5283 端口，占用时选择其他空闲端口。实际地址和密钥文件位置可在工作区数据目录的 `connection.json` 中查询；为 Agent 配置该地址和项目范围密钥，不把本机管理员密钥交给模型。
 
 ## 验证
 
