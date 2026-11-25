@@ -74,7 +74,8 @@ public sealed class CrewClient : IDisposable
     public Task<ContextDto> Context(Guid p, Guid c, Guid employee, Guid? r, Guid[]? referenceIds = null) => Send<ContextDto>(HttpMethod.Get,
         $"api/projects/{p}/chains/{c}/context?employeeId={employee}" + (r.HasValue ? "&roundId=" + r : "")
         + string.Concat((referenceIds ?? []).Select(x => "&referenceId=" + x)));
-    public Task<ComparisonDto> Compare(Guid p, Guid a, Guid b) => Send<ComparisonDto>(HttpMethod.Get, $"api/projects/{p}/compare?left={a}&right={b}");
+    public Task<ComparisonDto> Compare(Guid p, Guid a, Guid b, int? leftVersion = null, int? rightVersion = null) => Send<ComparisonDto>(HttpMethod.Get,
+        $"api/projects/{p}/compare?left={a}&right={b}" + (leftVersion.HasValue ? "&leftVersion=" + leftVersion : "") + (rightVersion.HasValue ? "&rightVersion=" + rightVersion : ""));
     public Task<PageDto<RoundDto>> Search(Guid p, SearchQuery q) => Send<PageDto<RoundDto>>(HttpMethod.Get, $"api/projects/{p}/rounds?skip={q.Skip}&take={q.Take}"
         + (string.IsNullOrWhiteSpace(q.Text) ? "" : "&q=" + Uri.EscapeDataString(q.Text))
         + (q.EmployeeId.HasValue ? "&employeeId=" + q.EmployeeId : "") + (q.ChainId.HasValue ? "&chainId=" + q.ChainId : "")

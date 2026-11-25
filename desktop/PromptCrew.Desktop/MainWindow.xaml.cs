@@ -28,6 +28,7 @@ public partial class MainWindow : Window
             var capture = Array.IndexOf(args, "--capture");
             if (capture >= 0 && capture + 1 < args.Length)
             {
+                for (var i = 0; workspace.IsBusy && i < 1200; i++) await Task.Delay(25);
                 await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
                 Capture(args[capture + 1]); Close();
             }

@@ -65,6 +65,9 @@ try {
         $completed = (Invoke-CrewTool @{ operation='save_result'; projectId=$project.id; roundId=$created.id; body=@{ clientRequestId=[Guid]::NewGuid().ToString(); expectedVersion=$created.version; output=$step.output; status='Completed'; artifacts=@('demo://battle/' + $created.number) } }).data.round
         $rounds += $completed
     }
+    $rounds[3] = (Invoke-CrewTool @{ operation='save_result'; projectId=$project.id; roundId=$rounds[3].id; body=@{ clientRequestId=[Guid]::NewGuid().ToString(); expectedVersion=$rounds[3].version; output=($rounds[3].latestOutput + "`n补充存档载入边界。"); status='Completed'; note='追加修订' } }).data.round
+    $comparison = (Invoke-CrewTool @{ operation='compare_rounds'; projectId=$project.id; roundId=$rounds[3].id; otherRoundId=$rounds[3].id; leftVersion=2; rightVersion=3 }).data
+    if ($comparison.leftOutputVersion -ne 2 -or $comparison.rightOutputVersion -ne 3 -or -not $comparison.outputDiff.Contains('+ 补充存档载入边界。')) { throw 'Historical output comparison failed.' }
     $replay = (Invoke-CrewTool $firstRequest).data
     if (-not $replay.replayed -or $replay.round.id -ne $rounds[0].id) { throw 'Idempotent retry failed.' }
     $firstRequest.body.input = '不同内容必须冲突'
@@ -74,7 +77,7 @@ try {
     if ($context.ancestors.Count -ne 2 -or $context.references.Count -ne 1 -or $context.compiledContext.Contains($steps[1].input)) { throw 'Branch context leaked an unreferenced sibling.' }
     $graph = (Invoke-CrewTool @{ operation='get_graph'; projectId=$project.id; chainId=$chain.id }).data
     if ($graph.nodes.Count -ne 6) { throw 'Unexpected node count.' }
-    $summary = @{ ok=$true; projectId=$project.id; chainId=$chain.id; employees=$team.Count; rounds=$graph.nodes.Count; handoffs=$true; branchContext=$true; idempotency=$true; conflict=$true; requestFiles=$script:sequence; dataDirectory=$dataDir }
+    $summary = @{ ok=$true; projectId=$project.id; chainId=$chain.id; employees=$team.Count; rounds=$graph.nodes.Count; handoffs=$true; branchContext=$true; idempotency=$true; conflict=$true; historicalComparison=$true; requestFiles=$script:sequence; dataDirectory=$dataDir }
     $summary | ConvertTo-Json | Set-Content (Join-Path $dataDir 'summary.json') -Encoding utf8NoBOM
     $summary | ConvertTo-Json
 }

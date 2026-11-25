@@ -101,6 +101,11 @@ public class RoundTests
         Assert.Equal(3, completed.Round.Version); Assert.Equal(2, completed.Round.Results.Length);
         Assert.Equal("工具执行失败", completed.Round.Results[0].Note);
         Assert.Equal("完成的代码", completed.Round.LatestOutput);
+        var comparisonUrl = $"/api/projects/{p.Id}/compare?left={round.Id}&right={round.Id}&leftVersion=2&rightVersion=3";
+        var historical = await (await c.GetAsync(comparisonUrl)).Read<ComparisonDto>();
+        Assert.Equal(2, historical.LeftOutputVersion); Assert.Equal(3, historical.RightOutputVersion);
+        Assert.Equal("内容相同", historical.InputDiff); Assert.Contains("+ 完成的代码", historical.OutputDiff);
+        Assert.Equal(HttpStatusCode.NotFound, (await c.GetAsync(comparisonUrl.Replace("leftVersion=2", "leftVersion=99"))).StatusCode);
         var replay = await (await c.PostAsJsonAsync(url, second, CrewJson.Options)).Read<RoundSaved>();
         Assert.True(replay.Replayed); Assert.Equal(2, replay.Round.Results.Length);
         Assert.Equal(HttpStatusCode.Conflict, (await c.PostAsJsonAsync(url, second with { Output = "悄悄覆盖" }, CrewJson.Options)).StatusCode);

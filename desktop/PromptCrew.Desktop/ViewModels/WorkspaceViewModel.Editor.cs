@@ -6,6 +6,13 @@ namespace PromptCrew.Desktop.ViewModels;
 
 public sealed partial class WorkspaceViewModel
 {
+    private int _leftOutputVersion, _rightOutputVersion;
+    public int LeftOutputVersion { get => _leftOutputVersion; set => SetProperty(ref _leftOutputVersion, value); }
+    public int RightOutputVersion { get => _rightOutputVersion; set => SetProperty(ref _rightOutputVersion, value); }
+    private static Choice<int>[] OutputVersions(RoundDto? round) => new[] { new Choice<int>(0, "最新输出"), new Choice<int>(1, "v1 · 尚未输出") }
+        .Concat((round?.Results ?? []).Select(x => new Choice<int>(x.Version, $"v{x.Version} · {Labels.State(x.Status)}"))).ToArray();
+    public Choice<int>[] LeftOutputVersions => OutputVersions(_compareTarget);
+    public Choice<int>[] RightOutputVersions => OutputVersions(_round);
     public string DraftInput { get => _draft.Input; set { _draft.Input = value; ChangedDraft(); } }
     public string DraftModel { get => _draft.Model; set { _draft.Model = value; ChangedDraft(); } }
     public string DraftTags { get => _draft.Tags; set { _draft.Tags = value; ChangedDraft(); } }
@@ -134,15 +141,17 @@ public sealed partial class WorkspaceViewModel
         {
             var page = await _api.Search(_project.Id, new(ChainId: _chain?.Id, Take: 200));
             Replace(ComparisonOptions, page.Items);
+            if (_round != null && !ComparisonOptions.Any(x => x.Id == _round.Id)) ComparisonOptions.Insert(0, _round);
             ComparisonTarget = page.Items.FirstOrDefault(x => x.Id == _round?.RevisesRoundId)
-                ?? page.Items.FirstOrDefault(x => x.Id != _round?.Id);
+                ?? page.Items.FirstOrDefault(x => x.Id != _round?.Id) ?? _round;
         });
     }
     private async Task Compare()
     {
         if (_project == null || _round == null || _compareTarget == null) return;
-        var result = await _api.Compare(_project.Id, _compareTarget.Id, _round.Id);
+        var result = await _api.Compare(_project.Id, _compareTarget.Id, _round.Id,
+            LeftOutputVersion == 0 ? null : LeftOutputVersion, RightOutputVersion == 0 ? null : RightOutputVersion);
         InputDiff = result.InputDiff; OutputDiff = result.OutputDiff;
-        Status = $"比较 {_compareTarget.Label} → {_round.Label}。";
+        Status = $"比较 {_compareTarget.Label} v{result.LeftOutputVersion} → {_round.Label} v{result.RightOutputVersion}。";
     }
 }

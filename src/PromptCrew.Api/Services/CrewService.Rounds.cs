@@ -195,11 +195,19 @@ public sealed partial class CrewService
         if (text.Length > 500000) throw new CrewException(413, "context_too_large", "上下文超过 500,000 字符，请拆分任务并显式引用成果。");
         return new(Map(project), Map(chain), Map(employee), path.ToArray(), references, text.ToString());
     }
-    public async Task<ComparisonDto> Compare(Guid projectId, Guid left, Guid right, AccessScope actor, CancellationToken ct)
+    public async Task<ComparisonDto> Compare(Guid projectId, Guid left, Guid right, AccessScope actor, CancellationToken ct, int? leftVersion = null, int? rightVersion = null)
     {
         actor.Require(projectId);
         var a = Map(await Round(projectId, left, ct)); var b = Map(await Round(projectId, right, ct));
-        return new(a, b, TextComparison.Diff(a.Input, b.Input), TextComparison.Diff(a.LatestOutput, b.LatestOutput));
+        static (string Output, int? Version) Pick(RoundDto round, int? version)
+        {
+            if (version == 1) return ("", 1);
+            var result = version.HasValue ? round.Results.FirstOrDefault(x => x.Version == version) : round.Results.LastOrDefault();
+            if (version.HasValue && result == null) throw Missing("输出版本");
+            return (result?.Output ?? "", result?.Version ?? 1);
+        }
+        var first = Pick(a, leftVersion); var second = Pick(b, rightVersion);
+        return new(a, b, TextComparison.Diff(a.Input, b.Input), TextComparison.Diff(first.Output, second.Output), first.Version, second.Version);
     }
     private static RoundDto Map(PromptRound x) => new(x.Id, x.ProjectId, x.ChainId, x.EmployeeId, x.ClientRequestId,
         x.ParentRoundId, x.RevisesRoundId, x.Number, x.Input, Read<EmployeeSnapshot>(x.EmployeeSnapshotJson), x.Model, x.Source,

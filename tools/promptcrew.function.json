@@ -13,6 +13,8 @@
           "employeeId": { "type": "string", "format": "uuid" },
           "roundId": { "type": "string", "format": "uuid", "description": "For get_context: the chosen parent; omit for a new root." },
           "otherRoundId": { "type": "string", "format": "uuid" },
+          "leftVersion": { "type": "integer", "minimum": 1, "description": "Optional output version of roundId for compare_rounds; omitted selects latest." },
+          "rightVersion": { "type": "integer", "minimum": 1, "description": "Optional output version of otherRoundId. Use the same round IDs to compare its output history." },
           "clientRequestId": { "type": "string", "format": "uuid", "description": "Only for get_by_request. For writes put clientRequestId inside body." },
           "referenceIds": { "type": "array", "items": { "type": "string", "format": "uuid" }, "maxItems": 24 },
           "query": {

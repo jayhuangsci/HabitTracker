@@ -125,7 +125,11 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     }
     public RoundDto? SelectedRound => _round;
     public ResultDto? SelectedResultVersion { get => _resultVersion; set { if (SetProperty(ref _resultVersion, value)) { OnPropertyChanged(nameof(HistoricalOutput)); OnPropertyChanged(nameof(HistoricalNote)); } } }
-    public RoundDto? ComparisonTarget { get => _compareTarget; set { if (SetProperty(ref _compareTarget, value)) NotifyState(); } }
+    public RoundDto? ComparisonTarget
+    {
+        get => _compareTarget;
+        set { if (SetProperty(ref _compareTarget, value)) { LeftOutputVersion = 0; OnPropertyChanged(nameof(LeftOutputVersions)); NotifyState(); } }
+    }
 
     public AsyncRelayCommand RefreshCommand { get; }
     public AsyncRelayCommand SaveRoundCommand { get; }
@@ -244,6 +248,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     {
         if (_project == null) return;
         var row = await _api.Round(_project.Id, id); _round = row;
+        RightOutputVersion = 0; OnPropertyChanged(nameof(RightOutputVersions));
         void SelectNode(IEnumerable<RoundNode> nodes)
         { foreach (var node in nodes) { node.IsSelected = node.Id == id; SelectNode(node.Children); } }
         SelectNode(Roots);

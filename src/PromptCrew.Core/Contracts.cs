@@ -43,7 +43,8 @@ public sealed record ContextDto(ProjectDto Project, ChainDto Chain, EmployeeDto 
 public sealed record GraphNode(Guid Id, Guid? ParentRoundId, int Number, Guid EmployeeId, string EmployeeName,
     string Role, RoundState Status, string Preview, Guid[] ReferenceRoundIds, Guid? RevisesRoundId);
 public sealed record GraphDto(Guid ProjectId, Guid ChainId, GraphNode[] Nodes);
-public sealed record ComparisonDto(RoundDto Left, RoundDto Right, string InputDiff, string OutputDiff);
+public sealed record ComparisonDto(RoundDto Left, RoundDto Right, string InputDiff, string OutputDiff,
+    int? LeftOutputVersion = null, int? RightOutputVersion = null);
 public sealed record AccessKeyDto(Guid Id, string Name, Guid[] ProjectIds, DateTime CreatedUtc, DateTime? RevokedUtc);
 public sealed record IssuedKey(string Token, AccessKeyDto Key);
 public sealed record RoleTemplate(string Id, string Name, string Role, string Responsibilities, string BasePrompt, string[] Skills);

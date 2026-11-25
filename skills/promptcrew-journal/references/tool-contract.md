@@ -65,4 +65,6 @@
 
 其他操作：`get_round`（项目/轮次）、`get_by_request`（项目/clientRequestId）、`get_graph`（项目/链）、`search_rounds`（项目，query 内可带 text/employeeId/chainId/tag/status/skip/take）、`compare_rounds`（项目、roundId、otherRoundId）。
 
+`compare_rounds` 可增加 `leftVersion` / `rightVersion` 指定历史输出版本，省略使用最新输出；两个轮次 ID 相同即可比较同一轮的历史结果。v1 表示尚未输出。
+
 修改目录使用 `create_project/update_project`、`create_employee/update_employee`、`create_chain/update_chain`。对象数据放 `body`，更新需 `expectedVersion`；创建项目要求管理员密钥，项目密钥可以在授权项目中创建员工、任务链和记录。

@@ -36,6 +36,8 @@ API 与旧训练服务独立，默认 `http://127.0.0.1:5283`。运行 `dotnet r
 
 不提供修改轮次输入、修改父节点或删除记录的路由。修订输入通过新轮次的 `revisesRoundId` 关联；结果修正再次 POST results。
 
+对比接口可增加 `leftVersion`、`rightVersion` 指定输出历史版本；省略时使用最新结果，v1 表示尚未输出。两个轮次 ID 可以相同，以直接比较该轮 v2 和 v3 等历史结果。不存在的版本返回 404，响应包含实际采用的输出版本号。
+
 ## 请求字段
 
 **项目：** `name` 必填且最多 120 字符；`goal`、`constraints` 最多 10,000；`background` 最多 30,000；`status` 为 Active / Paused / Archived。更新须带 `expectedVersion`。

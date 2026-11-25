@@ -49,6 +49,10 @@ public sealed class WorkspaceTests
                         vm.DraftOutput = "规则二"; vm.ResultNote = "修正数值"; await Execute(vm.SaveResultCommand, vm);
                         Assert.Equal(2, vm.SelectedRound!.Results.Length);
                         Assert.Equal("规则一", vm.SelectedRound.Results[0].Output);
+                        await vm.PrepareComparisonAsync(); vm.ComparisonTarget = vm.SelectedRound;
+                        vm.LeftOutputVersion = 2; vm.RightOutputVersion = 3;
+                        await Execute(vm.CompareCommand, vm);
+                        Assert.Contains("− 规则一", vm.OutputDiff); Assert.Contains("+ 规则二", vm.OutputDiff);
                         vm.ContinueCommand.Execute(null); vm.DraftInput = "探索即时制";
                         await Execute(vm.SaveRoundCommand, vm); branch = vm.SelectedRound!.Id;
                         Assert.Equal(root, vm.SelectedRound.ParentRoundId);

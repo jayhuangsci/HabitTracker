@@ -12,6 +12,8 @@ public sealed record ToolRequest
     public Guid? EmployeeId { get; init; }
     public Guid? RoundId { get; init; }
     public Guid? OtherRoundId { get; init; }
+    public int? LeftVersion { get; init; }
+    public int? RightVersion { get; init; }
     public Guid? ClientRequestId { get; init; }
     public Guid[] ReferenceIds { get; init; } = [];
     public SearchQuery? Query { get; init; }
@@ -53,7 +55,7 @@ public static class ToolRunner
             "get_context" => await api.Context(Project(), Chain(), Employee(), request.RoundId, request.ReferenceIds),
             "search_rounds" => await api.Search(Project(), request.Query ?? new()),
             "get_graph" => await api.Graph(Project(), Chain()),
-            "compare_rounds" => await api.Compare(Project(), Round(), Id(request.OtherRoundId, "otherRoundId")),
+            "compare_rounds" => await api.Compare(Project(), Round(), Id(request.OtherRoundId, "otherRoundId"), request.LeftVersion, request.RightVersion),
             _ => throw new ArgumentException("Unknown operation. See tools/promptcrew.function.json.")
         };
     }
