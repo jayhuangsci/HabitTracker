@@ -73,6 +73,8 @@ public sealed record EmployeeInput
 }
 public sealed record ChainInput
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? CreateId { get; init; }
     public string Name { get; init; } = "";
     public string Goal { get; init; } = "";
     public string AcceptanceCriteria { get; init; } = "";

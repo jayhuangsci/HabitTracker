@@ -85,9 +85,23 @@ public sealed partial class CrewService(CrewDbContext db, TimeProvider clock)
         var project = await Project(projectId, actor, ct);
         if (project.Status == ProjectState.Archived) throw new CrewException(409, "project_archived", "请先恢复已归档的项目。");
         Rules.EnumValue(input.Status);
+        if (!id.HasValue && input.CreateId.HasValue)
+        {
+            if (input.CreateId == Guid.Empty) throw new CrewException(400, "invalid_id", "任务创建 ID 不能为空。");
+            var existing = await db.Chains.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.CreateId, ct);
+            if (existing != null)
+            {
+                if (existing.ProjectId != projectId || existing.Name != Rules.Text(input.Name, "任务链名称", 120, true, true)
+                    || existing.Goal != Rules.Text(input.Goal, "任务目标", 10000, true)
+                    || existing.AcceptanceCriteria != Rules.Text(input.AcceptanceCriteria, "完成标准", 10000)
+                    || existing.Status != input.Status)
+                    throw new CrewException(409, "create_conflict", "此创建 ID 已被用于其他任务内容。");
+                return Map(existing);
+            }
+        }
         TaskChain row;
         if (id.HasValue) { row = await Chain(projectId, id.Value, ct); Rules.MatchVersion(row.Version, input.ExpectedVersion); Touch(row); }
-        else { row = new() { ProjectId = projectId }; Stamp(row); db.Chains.Add(row); }
+        else { row = new() { Id = input.CreateId ?? Guid.NewGuid(), ProjectId = projectId }; Stamp(row); db.Chains.Add(row); }
         row.Name = Rules.Text(input.Name, "任务链名称", 120, true, true);
         row.Goal = Rules.Text(input.Goal, "任务目标", 10000, true);
         row.AcceptanceCriteria = Rules.Text(input.AcceptanceCriteria, "完成标准", 10000);
