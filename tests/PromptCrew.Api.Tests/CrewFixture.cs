@@ -67,4 +67,10 @@ public static class ApiHelpers
     public static async Task<ChainDto> Chain(this HttpClient client, Guid projectId, string name = "战斗系统") =>
         await (await client.PostAsJsonAsync($"/api/projects/{projectId}/chains",
             new ChainInput { Name = name, Goal = "完成原型", AcceptanceCriteria = "规则明确且可以运行" }, CrewJson.Options)).Read<ChainDto>();
+    public static async Task<RoundSaved> AddRound(this HttpClient client, Guid projectId, Guid chainId, Guid employeeId, string input = "设计战斗系统", Guid? parent = null, Guid[]? references = null) =>
+        await (await client.PostAsJsonAsync($"/api/projects/{projectId}/chains/{chainId}/rounds", new RoundInput
+        { ClientRequestId = Guid.NewGuid(), EmployeeId = employeeId, ParentRoundId = parent, Input = input, ReferenceRoundIds = references ?? [], Tags = ["战斗"] }, CrewJson.Options)).Read<RoundSaved>();
+    public static async Task<RoundSaved> AddResult(this HttpClient client, RoundDto round, string output = "战斗规则", RoundState status = RoundState.Completed) =>
+        await (await client.PostAsJsonAsync($"/api/projects/{round.ProjectId}/rounds/{round.Id}/results", new ResultInput
+        { ClientRequestId = Guid.NewGuid(), ExpectedVersion = round.Version, Output = output, Status = status }, CrewJson.Options)).Read<RoundSaved>();
 }

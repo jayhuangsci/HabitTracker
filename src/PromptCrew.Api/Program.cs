@@ -44,6 +44,7 @@ app.MapGet("/health", async (CrewDbContext db, CancellationToken ct) =>
 app.MapGet("/", () => Results.Redirect("/health"));
 var api = app.MapGroup("/api");
 api.MapGet("/employee-templates", () => RoleTemplates.All);
+api.MapGet("/session", (HttpContext h) => new { h.Actor().IsAdmin, h.Actor().Name, ProjectIds = h.Actor().ProjectIds.ToArray() });
 api.MapGet("/projects", (HttpContext h, CrewService s, CancellationToken ct) => s.ListProjects(h.Actor(), ct));
 api.MapPost("/projects", async (ProjectInput input, HttpContext h, CrewService s, CancellationToken ct) =>
     Results.Created("/api/projects", await s.SaveProject(null, input, h.Actor(), ct)));
@@ -62,6 +63,23 @@ api.MapPut("/projects/{projectId:guid}/chains/{id:guid}", (Guid projectId, Guid 
 api.MapGet("/access-keys", (HttpContext h, CrewService s, CancellationToken ct) => s.ListKeys(h.Actor(), ct));
 api.MapPost("/access-keys", (AccessKeyInput input, HttpContext h, CrewService s, CancellationToken ct) => s.IssueKey(input, h.Actor(), ct));
 api.MapPost("/access-keys/{id:guid}/revoke", async (Guid id, HttpContext h, CrewService s, CancellationToken ct) => { await s.RevokeKey(id, h.Actor(), ct); return Results.NoContent(); });
+api.MapPost("/projects/{projectId:guid}/chains/{chainId:guid}/rounds", async (Guid projectId, Guid chainId, RoundInput input, HttpContext h, CrewService s, CancellationToken ct) =>
+{
+    var saved = await s.SaveRound(projectId, chainId, input, h.Actor(), ct);
+    return Results.Json(saved, statusCode: saved.Replayed ? 200 : 201);
+});
+api.MapGet("/projects/{projectId:guid}/rounds", (Guid projectId, string? q, Guid? employeeId, Guid? chainId, string? tag, RoundState? status, int? skip, int? take, HttpContext h, CrewService s, CancellationToken ct) =>
+    s.Search(projectId, new(q, employeeId, chainId, tag, status, skip ?? 0, take ?? 50), h.Actor(), ct));
+api.MapGet("/projects/{projectId:guid}/rounds/by-request/{requestId:guid}", (Guid projectId, Guid requestId, HttpContext h, CrewService s, CancellationToken ct) => s.GetRoundByRequest(projectId, requestId, h.Actor(), ct));
+api.MapGet("/projects/{projectId:guid}/rounds/{roundId:guid}", (Guid projectId, Guid roundId, HttpContext h, CrewService s, CancellationToken ct) => s.GetRound(projectId, roundId, h.Actor(), ct));
+api.MapPost("/projects/{projectId:guid}/rounds/{roundId:guid}/results", async (Guid projectId, Guid roundId, ResultInput input, HttpContext h, CrewService s, CancellationToken ct) =>
+{
+    var saved = await s.SaveResult(projectId, roundId, input, h.Actor(), ct);
+    return Results.Json(saved, statusCode: saved.Replayed ? 200 : 201);
+});
+api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/graph", (Guid projectId, Guid chainId, HttpContext h, CrewService s, CancellationToken ct) => s.Graph(projectId, chainId, h.Actor(), ct));
+api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/context", (Guid projectId, Guid chainId, Guid? roundId, Guid employeeId, HttpContext h, CrewService s, CancellationToken ct) => s.Context(projectId, chainId, roundId, employeeId, h.Actor(), ct));
+api.MapGet("/projects/{projectId:guid}/compare", (Guid projectId, Guid left, Guid right, HttpContext h, CrewService s, CancellationToken ct) => s.Compare(projectId, left, right, h.Actor(), ct));
 app.Run();
 
 public partial class Program;
