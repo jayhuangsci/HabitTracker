@@ -91,4 +91,3 @@ sequenceDiagram
 ## 验证
 
 `./scripts/Test-PromptCrewAgent.ps1` 启动独立本机服务，以管理员创建项目，再切换为项目范围密钥，经真实 CLI/HTTP 建立四名员工、六轮交接和分支。它验证原请求重放、不同内容冲突、祖先链与显式引用边界；请求文件和总结留在 `.local/agent-check-<UUID>/`，不修改正式数据，也不调用任何付费模型。
-

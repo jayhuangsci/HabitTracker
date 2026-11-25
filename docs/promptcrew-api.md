@@ -148,4 +148,3 @@ curl --fail-with-body -H "X-Api-Key: $PROMPTCREW_KEY" \
 ```
 
 变量由调用宿主设置，凭据不放进请求正文或版本控制。完整创建团队、交接、分支和冲突演示见 `scripts/Test-PromptCrewAgent.ps1`。
-
