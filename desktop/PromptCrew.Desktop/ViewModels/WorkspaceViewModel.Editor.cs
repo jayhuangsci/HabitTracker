@@ -49,7 +49,8 @@ public sealed partial class WorkspaceViewModel
             var references = Split(DraftReferences).Select(s => Guid.TryParse(s, out var id) ? id : throw new ArgumentException("成果引用须填写轮次 GUID，以逗号或换行分隔。")).ToArray();
             _draft.PendingRound = new RoundInput { ClientRequestId = Guid.NewGuid(), EmployeeId = _employee.Id,
                 ParentRoundId = _draft.ParentId, RevisesRoundId = _draft.RevisesId, Input = Rules.Text(DraftInput, "原始提示词", 100000, true),
-                Model = DraftModel, Tags = Split(DraftTags), ReferenceRoundIds = references, Notes = DraftNotes, Source = EntrySource.Manual };
+                Model = DraftModel, Tags = Split(DraftTags), ReferenceRoundIds = references, Notes = DraftNotes, Source = EntrySource.Manual,
+                ExpectedEmployeeVersion = _employee.Version };
         }
         PersistRequired(); NotifyState();
         var saved = await _api.SaveRound(_project.Id, _chain.Id, _draft.PendingRound);

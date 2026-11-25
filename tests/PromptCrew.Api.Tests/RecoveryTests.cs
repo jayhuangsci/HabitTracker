@@ -20,6 +20,8 @@ public sealed class RecoveryTests
         var outsider = await http.Project("另一个项目"); var outsiderEmployee = await http.Employee(outsider.Id); var outsiderChain = await http.Chain(outsider.Id);
         var foreign = await http.AddRound(outsider.Id, outsiderChain.Id, outsiderEmployee.Id);
         Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"/api/projects/{project.Id}/chains/{chain.Id}/context?employeeId={employee.Id}&referenceId={foreign.Round.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"/api/projects/{project.Id}/rounds?employeeId={outsiderEmployee.Id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await http.GetAsync($"/api/projects/{project.Id}/rounds?chainId={outsiderChain.Id}")).StatusCode);
     }
     [Fact]
     public async Task FullyStoppedHostReopensImmutableRoundsAndOutputHistory()

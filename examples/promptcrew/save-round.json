@@ -1,0 +1,15 @@
+{
+  "operation": "save_round",
+  "projectId": "00000000-0000-0000-0000-000000000001",
+  "chainId": "00000000-0000-0000-0000-000000000002",
+  "body": {
+    "clientRequestId": "00000000-0000-0000-0000-000000000003",
+    "employeeId": "00000000-0000-0000-0000-000000000004",
+    "expectedEmployeeVersion": 1,
+    "input": "依据当前分支的设计，实现护盾溢出伤害结算，并说明边界条件。",
+    "source": "Agent",
+    "model": "",
+    "tags": ["战斗", "程序"],
+    "referenceRoundIds": []
+  }
+}

@@ -87,6 +87,8 @@ public sealed record RoundInput
     public Guid[] ReferenceRoundIds { get; init; } = [];
     public string[] Tags { get; init; } = [];
     public string Notes { get; init; } = "";
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ExpectedEmployeeVersion { get; init; }
 }
 public sealed record ResultInput
 {

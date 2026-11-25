@@ -10,13 +10,13 @@
   <Style x:Key="Quiet" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="10,7"/><Setter Property="FontSize" Value="12"/></Style>
   <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Background" Value="#D2F580"/><Setter Property="Foreground" Value="#193729"/><Setter Property="Padding" Value="20,12"/></Style>
   <Style x:Key="ReadOnly" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}"><Setter Property="IsReadOnly" Value="True"/><Setter Property="TextWrapping" Value="Wrap"/><Setter Property="AcceptsReturn" Value="True"/><Setter Property="VerticalScrollBarVisibility" Value="Auto"/><Setter Property="Background" Value="#F7F9F3"/><Setter Property="Padding" Value="12"/><Setter Property="BorderThickness" Value="0"/></Style>
-  <Style TargetType="TreeViewItem"><Setter Property="IsExpanded" Value="{Binding IsExpanded,Mode=TwoWay}"/><Setter Property="Padding" Value="3,5"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
+  <Style TargetType="TreeViewItem"><Setter Property="IsSelected" Value="{Binding IsSelected,Mode=TwoWay}"/><Setter Property="IsExpanded" Value="{Binding IsExpanded,Mode=TwoWay}"/><Setter Property="Padding" Value="3,5"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
   <HierarchicalDataTemplate DataType="{x:Type vm:RoundNode}" ItemsSource="{Binding Children}">
    <StackPanel Margin="3,3,0,7"><TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding Detail}" Style="{StaticResource Caption}" Margin="0,6,0,0"/></StackPanel>
   </HierarchicalDataTemplate>
   <Style TargetType="TabItem"><Setter Property="FontSize" Value="12"/><Setter Property="Padding" Value="12,11"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem"><Border x:Name="Tab" Background="Transparent" Padding="{TemplateBinding Padding}" BorderBrush="Transparent" BorderThickness="0,0,0,3"><ContentPresenter ContentSource="Header"/></Border><ControlTemplate.Triggers><Trigger Property="IsSelected" Value="True"><Setter TargetName="Tab" Property="BorderBrush" Value="#9EC956"/><Setter Property="FontWeight" Value="SemiBold"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Setter.Value></Setter></Style>
  </Window.Resources>
- <Grid><Grid.RowDefinitions><RowDefinition Height="82"/><RowDefinition Height="*"/><RowDefinition Height="44"/></Grid.RowDefinitions>
+ <Grid Background="#F5F7F2"><Grid.RowDefinitions><RowDefinition Height="82"/><RowDefinition Height="*"/><RowDefinition Height="44"/></Grid.RowDefinitions>
   <Border Background="#193729" Padding="28,15"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="▰" Foreground="#D2F580" FontSize="27" Margin="0,-3,10,0"/><TextBlock Text="PromptCrew" Foreground="White" FontSize="23" FontWeight="SemiBold"/><Border Background="#34533D" CornerRadius="5" Padding="8,3" Margin="15,3,0,0"><TextBlock Text="AI 员工工作台" Foreground="#D2F580" FontSize="10"/></Border></StackPanel><TextBlock Text="让每一次提示、交接与修订都有迹可循。" Foreground="#B8C8AE" FontSize="11" Margin="1,5,0,0"/></StackPanel>
    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"><Button Content="连接设置" Command="{Binding ConnectionCommand}" Background="#33513D" Foreground="White" Margin="0,0,8,0"/><Button Content="API Key" Command="{Binding KeysCommand}" Background="#33513D" Foreground="White" Margin="0,0,8,0"/><Button Content="刷新工作台" Command="{Binding RefreshCommand}" Background="#D2F580"/></StackPanel>
@@ -42,7 +42,7 @@
     <Grid Margin="0,0,0,14"><TextBlock Text="任务链" FontSize="19" FontWeight="SemiBold"/><Button Content="＋ 新建" Command="{Binding NewChainCommand}" Style="{StaticResource Quiet}" HorizontalAlignment="Right"/></Grid>
     <ComboBox Grid.Row="1" ItemsSource="{Binding Chains}" SelectedItem="{Binding SelectedChain}" DisplayMemberPath="Name" IsEnabled="{Binding CanSelectWorkspace}" AutomationProperties.Name="当前任务链"/>
     <StackPanel Grid.Row="2" Margin="0,13,0,16"><TextBlock Text="{Binding ChainSummary}" Style="{StaticResource Caption}" MaxHeight="76"/><Button Content="编辑任务与完成标准" Command="{Binding EditChainCommand}" Style="{StaticResource Quiet}" HorizontalAlignment="Left" Padding="0,8"/></StackPanel>
-    <TreeView Grid.Row="3" x:Name="RoundTree" ItemsSource="{Binding Roots}" SelectedItemChanged="RoundSelected" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="提示词分支树"/>
+    <TreeView Grid.Row="3" x:Name="RoundTree" ItemsSource="{Binding Roots}" SelectedItemChanged="RoundSelected" IsEnabled="{Binding CanSelectWorkspace}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="提示词分支树"/>
     <TextBlock Grid.Row="4" Text="点击节点查看记录。继续、分支与输入修订都会保留原记录。" Style="{StaticResource Caption}" Margin="0,12,0,0"/>
    </Grid></Border>
    <Border Grid.Column="4" Style="{StaticResource Card}" Padding="20,14"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
@@ -78,6 +78,6 @@
     </TabControl>
    </Grid></Border>
   </Grid>
-  <Border Grid.Row="2" Background="#EAF0E3" Padding="23,10"><Grid><TextBlock Text="{Binding Status}" FontSize="11" TextTrimming="CharacterEllipsis"/><TextBlock Text="处理中…" HorizontalAlignment="Right" FontSize="11" Visibility="{Binding IsBusy,Converter={StaticResource Visible}}"/></Grid></Border>
+  <Border Grid.Row="2" Padding="23,10"><Border.Style><Style TargetType="Border"><Setter Property="Background" Value="#EAF0E3"/><Style.Triggers><DataTrigger Binding="{Binding HasError}" Value="True"><Setter Property="Background" Value="#FFE5DA"/></DataTrigger></Style.Triggers></Style></Border.Style><Grid><TextBlock Text="{Binding Status}" FontSize="11" TextTrimming="CharacterEllipsis"/><TextBlock Text="处理中…" HorizontalAlignment="Right" FontSize="11" Visibility="{Binding IsBusy,Converter={StaticResource Visible}}"/></Grid></Border>
  </Grid>
 </Window>

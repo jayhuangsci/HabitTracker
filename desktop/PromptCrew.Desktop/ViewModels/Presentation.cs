@@ -8,8 +8,10 @@ public sealed record Choice<T>(T Value, string Label)
 {
     public override string ToString() => Label;
 }
-public sealed class RoundNode(GraphNode node)
+public sealed class RoundNode(GraphNode node) : ViewModelBase
 {
+    private bool _selected;
+    public bool IsSelected { get => _selected; set => SetProperty(ref _selected, value); }
     public GraphNode Node { get; } = node;
     public Guid Id => Node.Id;
     public string Label => $"#{Node.Number:00}  {Node.EmployeeName}";

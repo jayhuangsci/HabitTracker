@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/PromptCrew.Tools/PromptCrew.Tools.csproj" />
     <Project Path="src/PromptCrew.Client/PromptCrew.Client.csproj" />
     <Project Path="src/PromptCrew.Core/PromptCrew.Core.csproj" />
     <Project Path="src/PromptCrew.Api/PromptCrew.Api.csproj" />

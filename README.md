@@ -1,218 +1,160 @@
-# HabitTracker · FORM
+# PromptCrew · AI 虚拟员工提示词管理器
 
-**A C# strength journal that remembers the plates, not just the total.**
+**像组织团队一样管理 AI 员工，让每一轮提示词、交接和修订都有迹可循。**
 
-[![Build and test](https://github.com/jayhuangsci/HabitTracker/actions/workflows/ci.yml/badge.svg)](https://github.com/jayhuangsci/HabitTracker/actions/workflows/ci.yml)
+[![PromptCrew](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml/badge.svg?branch=codex%2Fpromptcrew)](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
 ![Desktop](https://img.shields.io/badge/Desktop-WPF-24523C)
-![Mobile](https://img.shields.io/badge/Mobile-OpenSilver_%2B_MAUI-193729)
+![API](https://img.shields.io/badge/API-ASP.NET_Core-193729)
 ![Storage](https://img.shields.io/badge/Storage-SQLite-517A4C)
+![Project age](https://img.shields.io/date/1777390533?label=Project%20age&color=193729&cacheSeconds=86400 "Repository created April 28, 2026")
 
-![FORM training overview with sample workout history](docs/images/overview.png)
+![PromptCrew 中文桌面，四名员工与战斗系统分支](docs/images/promptcrew/workspace.png)
 
-## Why I built it
+一个项目可以有玩法设计师、程序员、美术设计师和数值策划，也可以由用户配置其他角色。一条任务链对应具体任务，员工依次接手；每轮输入、员工基础提示词快照、输出版本和成果引用都可追溯。
 
-At the gym, I think in plates: **45 lb + 25 lb + 10 lb on each side**. Recording only “205 lb” is realllyyyyy annoying(calculating the weights after a Squart PR attempting?come on). HabitTracker keeps the bar weight, ordered left and right plate stacks, repetitions, effort, and notes together in every set.
+本仓库由 **HabitTracker / FORM** 演进而来，复用 C# MVVM 与界面基础。原训练应用、OpenSilver 客户端和训练数据继续保留，使用说明见[原业务文档](docs/legacy-fitness.md)。PromptCrew 使用独立数据库。
 
-```text
-45 lb bar + (45 + 25 + 10) left + (45 + 25 + 10) right = 205 lb
-```
+## 三分钟体验
 
-The project grew from a general habit tracker into a focused training application. It demonstrates a complete C# workflow: WPF and OpenSilver mobile interfaces, MVVM state and commands, an ASP.NET Core REST API, EF Core migrations, durable storage, and automated tests.
-
-## Mobile: log every plate from your phone
-
-The new **OpenSilver C#/XAML client** shares the existing plate model and analytics. It has four phone-sized tabs, a live plate builder, persistent unfinished workouts and rest timers, history reuse, progress, habits, and CSV export. Local and Demo journals work independently of the API; Connected mode uses the existing service.
-
-```sh
-dotnet workload install wasm-tools
-dotnet run --project mobile/HabitTracker.Mobile.Browser
-```
-
-Open the [browser demo](http://127.0.0.1:5274/?demo=1), or run `./scripts/Start-Mobile.ps1 -Demo -OpenBrowser` with PowerShell 7. See the [mobile setup and architecture guide](docs/mobile.md) for Android/iOS tooling, exact commands, data behavior and verification.
-
-| Plate builder | History | Progress |
-| --- | --- | --- |
-| ![Mobile plate builder showing 205 lb](docs/images/mobile/workout.jpg) | ![Exact plate stacks in mobile history](docs/images/mobile/history.jpg) | ![Mobile training-volume chart](docs/images/mobile/progress.jpg) |
-
-These are actual browser screenshots at **360 logical px**, using synthetic records. The browser Release build is interactively verified; a standalone **Android Debug APK builds successfully**. Android device behavior and the configured **iOS launcher still need device/Mac validation**. No public preview hosting is configured.
-
-## Try the Windows desktop demo
-
-**Requirements:** Windows 10/11, the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), and PowerShell 7 or newer for the source scripts.
+需要 **Windows 10/11、.NET 10 SDK、PowerShell 7**。
 
 ```powershell
-git clone https://github.com/jayhuangsci/HabitTracker.git
+git clone --branch codex/promptcrew https://github.com/jayhuangsci/HabitTracker.git
 cd HabitTracker
-.\scripts\Start-Demo.ps1
+./scripts/Start-PromptCrew.ps1 -Demo
 ```
 
-The launcher builds the solution, starts a local API, seeds eight weeks of synthetic workouts, and opens the desktop app. Closing the app stops the API process it started. Sample records persist between demo runs in `.local/demo.db`.
-
-For your own journal, run:
-
-```powershell
-.\scripts\Start-App.ps1
-```
-
-Personal data uses `src/HabitTracker.Api/habittracker.db`. Existing habit data is retained through an additive migration. Database files, exports under `.local/`, logs, and build artifacts are excluded from new Git commits.
-
-If the default port is occupied, use `-Port 5254` with either launcher. The launchers configure the client automatically. See the [three-minute demo](docs/demo.md) for a guided walkthrough.
-
-## What works today
-
-| Feature | Implemented behavior |
-| --- | --- |
-| Per-side plate logging | Ordered stacks, custom bar weight, exact `decimal` arithmetic, live total and bar visualization |
-| Flexible input | `45lbs+25lbs+10`, fractional plates, empty sleeves, lb/kg, mirrored or independent sides |
-| Training sessions | Named and dated sessions, 12 barbell exercises, three starter routines, reps, RPE, warmup/working sets, notes |
-| Reliable saves | SQLite persistence, reload unfinished sessions, duplicate client-set protection, optimistic concurrency |
-| Rest timer | Starts at 90 seconds after a saved set; pause, resume, add 15 seconds, reset |
-| History | Search by session or exercise, inspect exact plate stacks, reuse a saved setup, resume an unfinished session |
-| Progress | Eight-week volume chart, 28-day totals, weekly goal, muscle distribution, best loads and estimated 1RM |
-| Export | CSV from the UI or API, preserving units and both stacks, with spreadsheet formula escaping |
-| Original habits | Create, edit, delete and log general habits; existing habit and statistics endpoints remain available |
-| Developer demo | Isolated sample database, API explorer, runnable API demonstration, reproducible screenshots |
-| Phone journal | OpenSilver MVVM UI, native file / browser IndexedDB persistence, isolated demo, optional API adapter, platform CSV export |
-
-![Plate builder showing a 205 lb barbell setup](docs/images/workout.png)
-
-## Log your first workout
-
-1. Open **Workout studio**, name the session, choose its date and a starter routine.
-2. Choose an exercise. Routines list suggested exercises; you select the exercise for each set.
-3. Choose units and bar weight. Enter `45 + 25 + 10` in the left sleeve and leave **Mirror** checked for a 205 lb total with a 45 lb bar.
-4. Enter repetitions, an optional RPE from 1–10, and optional notes. Choose **Working** or **Warmup**.
-5. Select **Log set**. The set is persisted immediately and the rest timer starts. Select a saved set and **Remove selected set** to correct an unfinished workout.
-6. Select **Finish workout**. Completed sessions contribute to progress. Use **Training history** to inspect or export them.
-
-Session name and date become fixed after its first save. The most recent unfinished session resumes on startup; older unfinished sessions can be selected in history. Completed sessions are read-only. **Reuse selected setup** copies a historical set into the builder for another set.
-
-### Plate and analytics rules
-
-- A plate expression uses `+` and decimal points. Optional `lb`, `lbs`, or `kg` suffixes must match the selected unit. Empty input means no plates on that sleeve.
-- Mirroring copies the entire left stack. Independent sides preserve both stacks; unequal side totals display a warning. “Balanced” refers to equal side totals.
-- Changing units loads that unit’s sample setup and standard bar: 45 lb or 20 kg. Existing saved sets retain their original units and plates.
-- Working volume is the sum of **total load × reps**. Warmups and unfinished sessions are excluded from progress. Mixed units are normalized to pounds using `1 lb = 0.45359237 kg`.
-- Weeks start on Monday. The overview covers the last 28 days; the volume chart shows eight calendar weeks through today. Personal records use all completed sessions through today.
-- Estimated 1RM uses the Epley equation for 1–12 reps, with a one-rep set equal to its actual weight. It is a training estimate, not a tested maximum.
-
-## Architecture
+演示创建“星港”游戏项目、四名员工和六轮记录：
 
 ```mermaid
-flowchart LR
-    View[WPF views and drawing controls] --> VM[MVVM view models]
-    VM --> Client[HttpClient]
-    Client --> API[ASP.NET Core controllers]
-    API --> Service[WorkoutService]
-    Service --> EF[EF Core]
-    EF --> DB[(SQLite)]
-    Mobile[OpenSilver mobile views] --> MobileVM[MobileWorkspace · MVVM]
-    MobileVM --> Journal[IWorkoutJournal]
-    Journal --> Local[Local / Demo documents]
-    Journal --> API
-    Local --> Device[(Native files / browser IndexedDB)]
-    Core["HabitTracker.Core<br/>PlateLoad · contracts · analytics · CSV"] -. shared C# rules .-> VM
-    Core -. shared C# rules .-> MobileVM
-    Core -. validation and calculations .-> Service
+flowchart TD
+    A["01 玩法设计 · 共同战斗规则"] --> B["02 程序 · 回合制实现"]
+    B --> C["03 数值 · 评估与交接"]
+    C --> D["04 程序 · 修正与输出补充"]
+    A --> E["05 玩法设计 · 即时制分支"]
+    E --> F["06 美术 · 命中反馈提示词"]
+    F -. "显式引用" .-> A
 ```
 
-The clients and API share contracts and domain calculations. The API validates every set independently and owns connected SQLite persistence; the mobile local adapter validates with the same rules and stores separate device journals. The domain library has no WPF, HTTP, or EF Core dependency. WPF draws its charts and plate visuals directly; OpenSilver uses XAML and Canvas with small browser/device adapters. Neither client needs a third-party charting framework.
+1. 点击“战斗系统原型”的任一节点，在“记录与输出”查看原始输入、角色快照与输出历史。
+2. 选中第一轮，点“从此轮继续”，选择另一名员工，输入提示词并保存，即形成新分支。
+3. 在“记录与输出”补充结果；再次保存会追加版本。“修订输入”会创建新记录并保留原文。
+4. 在“分支上下文”生成祖先链与显式引用；在“版本对比”和“搜索”检查历史。
+5. 关闭后重新启动，记录与本机草稿恢复。完整[演示与验证流程](docs/promptcrew-demo.md)。
+
+自己的项目使用：
+
+```powershell
+./scripts/Start-PromptCrew.ps1
+# 默认端口占用时：
+./scripts/Start-PromptCrew.ps1 -Port 5285
+```
+
+正式工作区首次为空，可用界面的“＋”创建项目、员工与任务链；员工编辑器提供四个角色模板。关闭桌面会停止该启动器创建的 API。已有服务不会被替换。
+
+## 已实现的功能
+
+| 能力 | 实际行为 |
+| --- | --- |
+| 项目与团队 | 项目背景、约束、状态；自定义员工职责、基础提示词、Skills；任务目标与完成标准 |
+| 提示词链 | 单父节点、分支、跨员工交接、同项目跨任务链引用；原始输入和角色快照保留 |
+| 历史与复用 | 输入修订新建记录；输出追加版本；复制、正文/员工/标签/状态搜索、逐行对比 |
+| 上下文 | 按当前父节点向上取祖先，并合并明确引用；兄弟分支不会自动混入 |
+| 幂等与并发 | 输入及输出请求 ID 去重；同 ID 不同内容返回 409；更新须匹配版本号 |
+| 项目隔离 | API Key 可限制项目；归属校验及数据库复合外键；支持撤销密钥 |
+| 桌面恢复 | 独立 SQLite；本机草稿与待确认请求持久化；断线重试沿用原请求 |
+| Agent 工具 | 可执行 C# HTTP 工具、函数定义、可安装 Skill、OpenAPI 与完整调用演示 |
+
+第一阶段提供记录与协作管理。**不内置模型推理、多 Agent 自动调度、云同步或 MCP 服务。** Skills 字段保存关联名称，不会自动下载或执行 Skill。
+
+## 让 Agent 保存实际任务
+
+保持 API 运行，在桌面“API Key”中签发仅能访问指定项目的密钥，保存到仓库外的文件。
+
+```powershell
+$env:PROMPTCREW_API_URL = 'http://127.0.0.1:5283/'
+$env:PROMPTCREW_KEY_FILE = 'C:/my-secrets/promptcrew-agent.key'
+$env:PROMPTCREW_TOOLS_DLL = (Resolve-Path 'src/PromptCrew.Tools/bin/Release/net10.0/PromptCrew.Tools.dll').Path
+
+'{"operation":"list_projects"}' | Set-Content .local/list-projects.json -Encoding utf8NoBOM
+dotnet $env:PROMPTCREW_TOOLS_DLL invoke .local/list-projects.json
+```
+
+启动脚本已创建 `.local` 演示目录；独立调用前可用 `New-Item -ItemType Directory .local -Force` 创建请求文件目录。
+
+工具成功返回 `ok: true`。写入请求先保存到 JSON 文件，失败后用同一文件和同一 `clientRequestId` 重试。Agent 保存时还需提交实际采用的 `expectedEmployeeVersion`；员工定义变化会报冲突。
+
+- [Agent 配置、Skill 安装与云端访问](docs/promptcrew-agent.md)
+- [Skill 工作流](skills/promptcrew-journal/SKILL.md) · [函数定义](tools/promptcrew.function.json)
+- [API、请求字段与调用示例](docs/promptcrew-api.md)
+
+独立运行 API（Windows / Linux / macOS，需 .NET 10 SDK）：
+
+```powershell
+dotnet run --project src/PromptCrew.Api
+```
+
+默认监听 `http://127.0.0.1:5283`，开发模式文档位于 [Swagger](http://127.0.0.1:5283/swagger)。首次启动生成管理员密钥文件，不在控制台打印。默认只绑定本机；云端 Agent 需要可达的 HTTPS 地址和配置在宿主中的项目密钥，详见接入文档。
+
+## 数据与 C# 实现
 
 ```mermaid
 erDiagram
-    WorkoutSession ||--o{ WorkoutSet : contains
-    WorkoutSession {
-        int Id PK
-        string Name
-        date Date
-        datetime CompletedAt
-        int Revision
+    PROJECT ||--o{ EMPLOYEE : owns
+    PROJECT ||--o{ TASK_CHAIN : owns
+    TASK_CHAIN ||--o{ PROMPT_ROUND : contains
+    EMPLOYEE ||--o{ PROMPT_ROUND : performs
+    PROMPT_ROUND o|--o{ PROMPT_ROUND : parent
+    PROMPT_ROUND ||--o{ OUTPUT_REVISION : preserves
+    PROMPT_ROUND ||--o{ ROUND_REFERENCE : cites
+    PROMPT_ROUND ||--o{ ROUND_REFERENCE : referenced_by
+    PROJECT {
+        guid id
+        int version
     }
-    WorkoutSet {
-        int Id PK
-        int WorkoutSessionId FK
-        guid ClientId UK
-        string ExerciseId
-        decimal BarWeight
-        string LeftPlatesJson
-        string RightPlatesJson
-        enum Unit
-        int Reps
-        decimal Rpe
-        enum Kind
-    }
-    Habit ||--o{ HabitLog : tracks
-    Habit {
-        int Id PK
-        string Name UK
-        string Unit
-    }
-    HabitLog {
-        int Id PK
-        int HabitId FK
-        date Date
-        decimal Quantity
+    PROMPT_ROUND {
+        guid id
+        guid clientRequestId
+        guid parentRoundId
+        guid revisesRoundId
+        string employeeSnapshot
+        string rawInput
+        int version
     }
 ```
 
-Read the [engineering decisions](docs/architecture.md), [database notes](docs/database.md), and [API contract](docs/api.md).
+| 工程 | 职责 |
+| --- | --- |
+| `PromptCrew.Core` | C# records、契约、枚举、校验与有界文本差异；不引用 WPF 或 EF |
+| `PromptCrew.Api` | Minimal API、项目权限、EF Core 迁移、事务性保存、幂等与并发处理 |
+| `PromptCrew.Client` | WPF 和工具共享的类型化 HTTP 客户端与错误处理 |
+| `PromptCrew.Desktop` | WPF/MVVM、树状轮次、草稿恢复；链接复用原命令和基础主题 |
+| `PromptCrew.Tools` | 将 JSON 函数参数映射为真实 HTTP 调用；宿主负责提供密钥 |
 
-## Build and verify
+具体复用决策、并发与时间处理见[实现说明](docs/promptcrew-architecture.md)。
+
+| 数据 | 默认位置 |
+| --- | --- |
+| 正式记录与管理员密钥 | `%LOCALAPPDATA%/PromptCrew/personal/promptcrew.db`、`admin.key` |
+| 源码演示记录 | `.local/promptcrew-demo/` |
+| 源码启动器草稿 | 对应数据目录内的 `desktop-settings.json` |
+| 单独启动桌面的草稿 | `%LOCALAPPDATA%/PromptCrew/desktop-settings.json` |
+| 原训练数据 | 原路径保留，新应用不会读取或迁移 |
+
+原始输入不可原地修改，父节点仅在创建时指定，因此不能由正常 API 构造循环。输出和备注修正通过追加结果保留历史。时间以 UTC 持久化，桌面按本机时区显示；链内顺序使用服务器分配的序号，避免依赖客户端时钟。
+
+## 验证与打包
 
 ```powershell
-dotnet build HabitTracker.slnx -c Release --warnaserror
-dotnet test HabitTracker.slnx -c Release
-dotnet tool restore
-dotnet ef migrations has-pending-model-changes --project src/HabitTracker.Api
+dotnet test PromptCrew.slnx -c Release
+./scripts/Test-PromptCrewAgent.ps1
+./scripts/Publish-PromptCrew.ps1 -SelfContained
 ```
 
-The suite contains **49 automated test cases**: 19 domain cases, 9 API cases using real SQLite, 20 mobile persistence/adapter/workspace/timer cases, and one WPF integration case that exercises a persisted workout from creation through history reuse. It also checks that upgrading the original schema preserves habit data.
+- **23 个 API 集成测试 + 1 个 WPF 工作流测试**：真实 SQLite，覆盖项目隔离、链路合法性、分支引用、重复请求、并发冲突、角色快照、版本保留、停止服务后的恢复，以及响应丢失后重试。
+- Agent 演示通过真实 CLI → HTTP → SQLite 创建四名员工、六轮交接与分支，并检查重放、冲突和上下文边界。
+- 打包生成 `artifacts/PromptCrew-win-x64.zip`；解压后用 PowerShell 7 运行 `./Run.ps1 -Demo`。自包含包无需安装 .NET。
+- [交付记录及各批限制](docs/promptcrew-delivery.md)；GitHub Actions 同时检查新产品与保留的原业务。
 
-GitHub Actions runs the complete solution on Windows and the domain/API/mobile-core suites on Linux, checks migration consistency, and produces a self-contained Windows x64 ZIP. The mobile workflow publishes browser files and an Android development APK. High and critical NuGet audit warnings fail restore. OpenSilver hosts build separately from the root solution so desktop reviewers do not need mobile workloads; see [mobile verification](docs/mobile.md#repeat-verification).
-
-For an API-only run on Windows, Linux, or macOS:
-
-```sh
-dotnet run --project src/HabitTracker.Api --launch-profile http
-```
-
-The development API explorer is at [localhost:5253/swagger](http://localhost:5253/swagger), and readiness is at [localhost:5253/health](http://localhost:5253/health). The desktop URL can also be configured with `HABITTRACKER_API_URL`.
-
-## Package a reviewer demo
-
-```powershell
-.\scripts\Publish-App.ps1 -SelfContained
-```
-
-This produces `artifacts/HabitTracker-win-x64.zip`, containing the desktop client, API, runtime, and a launcher. Extract it and run `./Run.ps1 -Demo` from PowerShell; no SDK or separate .NET installation is needed. A published package stores its data under `%LOCALAPPDATA%\HabitTracker`, separately from a source checkout. Without `-SelfContained`, both the .NET 10 Desktop Runtime and ASP.NET Core 10 Runtime are required.
-
-Capture the actual app screens with synthetic data:
-
-```powershell
-.\scripts\Start-Demo.ps1 -CaptureDirectory docs\images
-```
-
-## Project map
-
-```text
-HabitTracker/                    WPF client, MVVM, flat theme, drawing controls
-src/HabitTracker.Core/           Plate value object, shared contracts, analytics, CSV
-src/HabitTracker.Api/            REST API, EF Core entities, migrations, demo seeder
-src/HabitTracker.Mobile.Core/    Device journals, API adapter, mobile MVVM, timer
-mobile/                         OpenSilver views, browser and Android/iOS launchers
-tests/HabitTracker.Core.Tests/   Calculation, parser, unit and CSV tests
-tests/HabitTracker.Api.Tests/    HTTP and SQLite migration tests
-tests/HabitTracker.Desktop.Tests/ WPF view and persisted command-flow test
-tests/HabitTracker.Mobile.Tests/ Device persistence, adapters, recovery and timer tests
-scripts/                        Source/demo launchers and Windows packaging
-docs/                           Walkthrough, architecture, API, screenshots
-```
-
-## Scope and inspiration
-
-This is a single-user application. The API has no authentication and should remain local/private; public or multi-user hosting needs authentication and per-user data isolation. The desktop is Windows-only, while the domain/API and mobile state library are cross-platform. OpenSilver provides a browser preview and MAUI Android/iOS launchers; platform verification limits are documented above. Exercise and routine catalogs are curated C# data; custom catalog editing and automatic cloud sync are outside the current implementation.
-
-The focus on set-level records and simple training analysis is inspired by [Xunji / 训记](https://apps.apple.com/us/app/id1464915553). The per-side plate model, implementation, UI, and assets in this repository are independent.
-
-For interview preparation, see [project talking points and evidence](docs/resume.md).
+当前按单机使用设计。搜索使用 SQLite 正文过滤；对比保留共同前后文后显示中段替换，不保证最短差异。祖先链上限 256 轮、上下文上限 500,000 字符、每页最多 200 条；长任务可拆链并引用成果。API Key 只有项目范围，暂未细分只读/写入权限；本地数据库、草稿和密钥文件依赖操作系统权限保护，不提供应用级加密。

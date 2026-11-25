@@ -96,7 +96,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     public string CurrentEmployeeLabel => _employee == null ? "请选择负责员工" : $"本轮员工：{_employee.Name} · {_employee.Role}";
     public string RevisionLabel => _draft.RevisesId.HasValue ? "这是一个保留原记录的输入修订版本。" : "保存后原始输入保持不变，可继续分支或创建修订。";
     public string RecordTitle => _round == null ? "选择一轮记录" : $"{_round.Label} · {Labels.State(_round.Status)} · v{_round.Version}";
-    public string RecordMetadata => _round == null ? "" : $"记录 ID  {_round.Id}\n请求 ID  {_round.ClientRequestId}\n{_round.CreatedUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss} · {_round.Model} · {_round.Source}\n角色快照 v{_round.EmployeeSnapshot.DefinitionVersion} · {_round.EmployeeSnapshot.Role}\n{_round.EmployeeSnapshot.Responsibilities}\n引用：{string.Join(", ", _round.ReferenceRoundIds)}";
+    public string RecordMetadata => _round == null ? "" : $"记录 ID  {_round.Id}\n请求 ID  {_round.ClientRequestId}\n{_round.CreatedUtc.ToLocalTime():yyyy-MM-dd HH:mm:ss} · {_round.Model} · {(_round.Source == EntrySource.Agent ? "Agent 保存" : "手动录入")}\n角色快照 v{_round.EmployeeSnapshot.DefinitionVersion} · {_round.EmployeeSnapshot.Role}\n{_round.EmployeeSnapshot.Responsibilities}\n标签：{string.Join(" / ", _round.Tags)}\n引用：{string.Join(", ", _round.ReferenceRoundIds)}\n备注：{_round.Notes}";
     public string RecordInput => _round?.Input ?? "";
     public string RecordBasePrompt => _round?.EmployeeSnapshot.BasePrompt ?? "";
     public string HistoricalOutput => _resultVersion?.Output ?? "此轮尚未补充输出。";
@@ -244,6 +244,9 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     {
         if (_project == null) return;
         var row = await _api.Round(_project.Id, id); _round = row;
+        void SelectNode(IEnumerable<RoundNode> nodes)
+        { foreach (var node in nodes) { node.IsSelected = node.Id == id; SelectNode(node.Children); } }
+        SelectNode(Roots);
         if (_draft.ResultRoundId != id && !HasPending)
         {
             if (_draft.ResultRoundId is { } previous)

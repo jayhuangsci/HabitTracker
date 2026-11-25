@@ -19,6 +19,8 @@ public sealed partial class CrewService
     private static RoundInput Validate(RoundInput input)
     {
         Rules.RequestId(input.ClientRequestId); Rules.EnumValue(input.Source);
+        if (input.Source == EntrySource.Agent && input.ExpectedEmployeeVersion is null or < 1)
+            throw new CrewException(400, "employee_version_required", "Agent 保存时请携带实际使用的 expectedEmployeeVersion。");
         if (input.EmployeeId == Guid.Empty) throw new CrewException(400, "employee_required", "请选择负责员工。");
         var refs = input.ReferenceRoundIds ?? [];
         if (refs.Length > 24 || refs.Any(x => x == Guid.Empty) || refs.Distinct().Count() != refs.Length)
@@ -43,6 +45,7 @@ public sealed partial class CrewService
             var project = await Project(projectId, actor, ct);
             var chain = await Chain(projectId, chainId, ct);
             var employee = await Employee(projectId, input.EmployeeId, ct);
+            if (input.ExpectedEmployeeVersion.HasValue) Rules.MatchVersion(employee.Version, input.ExpectedEmployeeVersion);
             if (project.Status != ProjectState.Active || chain.Status != ChainState.Active || !employee.IsActive)
                 throw new CrewException(409, "workspace_inactive", "项目、任务链和员工均需处于启用状态，才能新增轮次。");
             foreach (var ancestor in new[] { input.ParentRoundId, input.RevisesRoundId }.Where(x => x.HasValue).Select(x => x!.Value).Distinct())
@@ -127,6 +130,8 @@ public sealed partial class CrewService
     public async Task<PageDto<RoundDto>> Search(Guid projectId, SearchQuery filter, AccessScope actor, CancellationToken ct)
     {
         await Project(projectId, actor, ct);
+        if (filter.EmployeeId.HasValue) await Employee(projectId, filter.EmployeeId.Value, ct);
+        if (filter.ChainId.HasValue) await Chain(projectId, filter.ChainId.Value, ct);
         if (filter.Skip < 0 || filter.Take is < 1 or > 200) throw new CrewException(400, "invalid_page", "skip 至少为 0，take 范围为 1–200。");
         if (filter.Status.HasValue) Rules.EnumValue(filter.Status.Value);
         var q = RoundQuery.AsNoTracking().Where(x => x.ProjectId == projectId);
