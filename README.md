@@ -38,7 +38,9 @@ cd HabitTracker
 .\Start-PromptCrew-Demo.cmd
 ```
 
-演示创建“星港”游戏项目、四名员工和六轮记录：
+首次启动演示会创建“星港”游戏项目、四名员工和十二轮记录，每人三轮。默认“总览”按员工并排展示纵向历史卡片，连接线表示该员工记录的时间先后。已有演示数据保持原样，不会自动补写。
+
+下面是任务详情中保留的部分分支关系：
 
 ```mermaid
 flowchart TD
@@ -50,11 +52,13 @@ flowchart TD
     F -. "显式引用" .-> A
 ```
 
-1. 点击“战斗系统原型”的任一节点，在“记录与输出”查看原始输入、角色快照与输出历史。
-2. 选中第一轮，点“从此轮继续”，选择另一名员工，输入提示词并保存，即形成新分支。
-3. 在“记录与输出”补充结果；再次保存会追加版本。“修订输入”会创建新记录并保留原文。
-4. 在“分支上下文”生成祖先链与显式引用；在“版本对比”和“搜索”检查历史。
-5. 关闭后重新启动，记录与本机草稿恢复。完整[演示与验证流程](docs/promptcrew-demo.md)。
+1. 在“总览”查看每名员工的多轮提示词与成果摘要，点击卡片打开完整记录。
+2. 点击左侧员工，进入该员工的“工作记录”“任务与提示词”“职责与 Skills”。
+3. 在任务详情中选中历史节点，点“从此轮继续”记录新工作；“修订输入”创建新版本并保留原文。
+4. 在“记录与输出”补充结果，通过“查看本轮祖先与引用”核对实际上下文；版本对比与搜索仍可使用。
+5. 返回总览会恢复浏览位置；切换员工时分别保留草稿。关闭并重启后记录与本机草稿恢复。完整[演示与验证流程](docs/promptcrew-demo.md)。
+
+![员工工作记录与参与任务](docs/images/promptcrew/employee-history.png)
 
 自己的项目使用：
 
@@ -79,6 +83,7 @@ powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File "C:\Users\HOME\One
 | 能力 | 实际行为 |
 | --- | --- |
 | 项目与团队 | 项目背景、约束、状态；自定义员工职责、基础提示词、Skills；任务目标与完成标准 |
+| 员工历史总览 | 每名员工独立的时间顺序卡片链；点击卡片进入完整记录，返回保留浏览位置 |
 | 提示词链 | 单父节点、分支、跨员工交接、同项目跨任务链引用；原始输入和角色快照保留 |
 | 历史与复用 | 输入修订新建记录；输出追加版本；复制、正文/员工/标签/状态搜索；跨轮次及同轮历史输出对比 |
 | 上下文 | 按当前父节点向上取祖先，并合并明确引用；兄弟分支不会自动混入 |
@@ -150,7 +155,7 @@ erDiagram
 | `PromptCrew.Core` | C# records、契约、枚举、校验与有界文本差异；不引用 WPF 或 EF |
 | `PromptCrew.Api` | Minimal API、项目权限、EF Core 迁移、事务性保存、幂等与并发处理 |
 | `PromptCrew.Client` | WPF 和工具共享的类型化 HTTP 客户端与错误处理 |
-| `PromptCrew.Desktop` | WPF/MVVM、树状轮次、草稿恢复；链接复用原命令和基础主题 |
+| `PromptCrew.Desktop` | WPF/MVVM、员工历史总览、员工工作区、任务树、员工独立草稿；复用原命令和基础主题 |
 | `PromptCrew.Launcher` | 双击 exe 启动、空闲端口选择、本地服务认证检查与退出清理 |
 | `PromptCrew.Tools` | 将 JSON 函数参数映射为真实 HTTP 调用；宿主负责提供密钥 |
 
@@ -174,7 +179,7 @@ dotnet test PromptCrew.slnx -c Release
 ./scripts/Publish-PromptCrew.ps1 -SelfContained
 ```
 
-- **23 个 API 集成测试 + 1 个 WPF 工作流测试**：真实 SQLite，覆盖项目隔离、链路合法性、分支引用、重复请求、并发冲突、角色快照、版本保留、停止服务后的恢复，以及响应丢失后重试。
+- **25 个 API 集成测试 + 1 个 WPF 工作流测试**：真实 SQLite，覆盖项目隔离、链路合法性、分支引用、重复请求、并发冲突、角色快照、版本保留、重启恢复与响应丢失后重试。WPF 测试还通过实际按钮绑定验证员工/卡片导航、总览位置恢复、跨任务上下文和员工草稿隔离。
 - Agent 演示通过真实 CLI → HTTP → SQLite 创建四名员工、六轮交接与分支，并检查重放、冲突和上下文边界。
 - 打包生成 `artifacts/PromptCrew-win-x64.zip`；解压后双击 `PromptCrew-Demo.exe` 或 `PromptCrew.exe`。自包含包无需安装 .NET。
 - `./scripts/Test-PromptCrewPackage.ps1 -PackageDirectory artifacts/PromptCrew-win-x64` 验证真实 exe 启动、端口避让、桌面渲染、服务退出与缺失文件的错误提示。

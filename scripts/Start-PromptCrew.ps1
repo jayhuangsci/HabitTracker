@@ -2,6 +2,7 @@ param(
     [switch]$Demo,
     [int]$Port = 5283,
     [string]$CaptureDirectory,
+    [string]$DataDirectory,
     [switch]$NoBuild
 )
 $ErrorActionPreference = 'Stop'
@@ -11,7 +12,7 @@ if (-not $NoBuild) {
     dotnet build (Join-Path $repo 'PromptCrew.slnx') -c Release --nologo -v minimal
     if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 }
-$dataDir = if ($Demo) { Join-Path $repo '.local/promptcrew-demo' } else { Join-Path $env:LOCALAPPDATA 'PromptCrew/personal' }
+$dataDir = if ($DataDirectory) { [IO.Path]::GetFullPath($DataDirectory) } elseif ($Demo) { Join-Path $repo '.local/promptcrew-demo' } else { Join-Path $env:LOCALAPPDATA 'PromptCrew/personal' }
 New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
 $apiDll = Join-Path $repo 'src/PromptCrew.Api/bin/Release/net10.0/PromptCrew.Api.dll'
 $desktopExe = Join-Path $repo 'desktop/PromptCrew.Desktop/bin/Release/net10.0-windows/PromptCrew.Desktop.exe'
@@ -41,10 +42,13 @@ try {
     Write-Host "PromptCrew ready: $baseUrl | data: $dataDir"
     if ($CaptureDirectory) {
         $captureDir = [IO.Path]::GetFullPath($CaptureDirectory); New-Item -ItemType Directory -Path $captureDir -Force | Out-Null
-        foreach ($tab in @(0,1,2,3,4)) {
-            $image = Join-Path $captureDir "workspace-$tab.png"
-            $desktop = Start-Process -FilePath $desktopExe -ArgumentList @('--tab', $tab, '--capture', ('"' + $image + '"')) -WindowStyle Hidden -PassThru -Wait
-            if ($desktop.ExitCode -ne 0) { throw "Desktop capture failed: tab $tab" }
+        $captures = @(@{name='overview';view='overview'}, @{name='employee-history';view='employee'}, @{name='employee-profile';view='profile'}, @{name='record';view='record';tab=1}, @{name='comparison';view='record';tab=3})
+        foreach ($capture in $captures) {
+            $image = Join-Path $captureDir ($capture.name + '.png')
+            $arguments = @('--view', $capture.view, '--capture', ('"' + $image + '"'))
+            if ($capture.ContainsKey('tab')) { $arguments += @('--tab', $capture.tab) }
+            $desktop = Start-Process -FilePath $desktopExe -ArgumentList $arguments -WindowStyle Hidden -PassThru -Wait
+            if ($desktop.ExitCode -ne 0) { throw "Desktop capture failed: $($capture.name)" }
         }
     } else {
         $desktop = Start-Process -FilePath $desktopExe -PassThru -Wait

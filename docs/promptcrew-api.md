@@ -29,6 +29,7 @@ API 与旧训练服务独立，默认 `http://127.0.0.1:5283`。运行 `dotnet r
 | POST | `/api/projects/p/rounds/r/results` | 追加输出版本 |
 | GET | `/api/projects/p/rounds` | 搜索，见下文 |
 | GET | `/api/projects/p/chains/c/graph` | 所有节点、父节点、引用与修订关系 |
+| GET | `/api/projects/p/activity` | 项目内全部员工历史的轻量摘要，按创建时间正序 |
 | GET | `/api/projects/p/chains/c/context` | 当前员工、祖先链及显式引用 |
 | GET | `/api/projects/p/compare?left=r&right=r2` | 原始输入 / 最新输出逐行对比 |
 | GET / POST | `/api/access-keys` | 管理员列出描述 / 签发项目密钥 |
@@ -96,6 +97,8 @@ API 与旧训练服务独立，默认 `http://127.0.0.1:5283`。运行 `dotnet r
 错误使用 ProblemDetails，包含 `code` 与 `detail`。其他常见状态：400 校验失败、401 密钥缺失/无效、403 项目越权、404 归属不符或不存在、413 上下文过大。
 
 ## 搜索和上下文
+
+`activity` 用于桌面总览。每条包含记录/员工/任务 ID、任务名称、时间、状态、版本、真实父节点与输入修订目标，以及最多 160 字符的输入预览和 220 字符的最新输出预览。不载入完整历史输出或角色提示词；点击卡片时再获取完整轮次。接口校验项目范围，时间返回 UTC。桌面按员工分组，视觉连接仅表示各员工记录的时间顺序，不修改数据库的父节点关系。
 
 搜索参数：`q`（输入、轮次备注和全部历史输出），`employeeId`、`chainId`、`tag`（精确标签）、`status`、`skip`、`take`（1–200，默认 50）。返回 `items/total/skip/take`，按创建时间降序。
 

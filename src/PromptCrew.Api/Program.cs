@@ -82,6 +82,7 @@ api.MapPost("/projects/{projectId:guid}/rounds/{roundId:guid}/results", async (G
 api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/graph", (Guid projectId, Guid chainId, HttpContext h, CrewService s, CancellationToken ct) => s.Graph(projectId, chainId, h.Actor(), ct));
 api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/context", (Guid projectId, Guid chainId, Guid? roundId, Guid employeeId, [Microsoft.AspNetCore.Mvc.FromQuery] Guid[]? referenceId, HttpContext h, CrewService s, CancellationToken ct) => s.Context(projectId, chainId, roundId, employeeId, h.Actor(), ct, referenceId));
 api.MapGet("/projects/{projectId:guid}/compare", (Guid projectId, Guid left, Guid right, int? leftVersion, int? rightVersion, HttpContext h, CrewService s, CancellationToken ct) => s.Compare(projectId, left, right, h.Actor(), ct, leftVersion, rightVersion));
+api.MapGet("/projects/{projectId:guid}/activity", (Guid projectId, HttpContext h, CrewService s, CancellationToken ct) => s.Activity(projectId, h.Actor(), ct));
 app.Run();
 
 public partial class Program;

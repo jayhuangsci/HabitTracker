@@ -1,10 +1,9 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using PromptCrew.Core;
 using PromptCrew.Desktop.ViewModels;
 
 namespace PromptCrew.Desktop;
@@ -12,43 +11,73 @@ namespace PromptCrew.Desktop;
 public partial class MainWindow : Window
 {
     private readonly WorkspaceViewModel _workspace;
+    private Guid? _overviewProject;
     public MainWindow(WorkspaceViewModel workspace)
     {
         InitializeComponent(); _workspace = workspace; DataContext = workspace;
         workspace.EditRequested += (section, edit) => new CatalogWindow(new CatalogEditor(workspace, section, edit)) { Owner = this }.ShowDialog();
         workspace.ConnectionRequested += () => new ConnectionWindow(workspace) { Owner = this }.ShowDialog();
         workspace.KeysRequested += () => new KeysWindow(workspace) { Owner = this }.ShowDialog();
-        Closing += (_, _) => workspace.Dispose();
+        workspace.LeavingOverview += OverviewPanel.SavePosition;
+        workspace.OverviewShown += OverviewPanel.RestorePosition;
+        workspace.EmployeeOpened += EmployeePanel.ShowHistory;
+        workspace.RecordOpened += () => EmployeePanel.ShowEditor(1);
+        workspace.PropertyChanged += ProjectChanged;
+        Closing += (_, _) =>
+        {
+            workspace.PropertyChanged -= ProjectChanged;
+            workspace.Dispose();
+        };
         Loaded += async (_, _) =>
         {
             await workspace.InitializeAsync();
             var args = Environment.GetCommandLineArgs();
-            var tab = Array.IndexOf(args, "--tab");
-            if (tab >= 0 && tab + 1 < args.Length && int.TryParse(args[tab + 1], out var index)) EditorTabs.SelectedIndex = Math.Clamp(index, 0, 4);
-            var capture = Array.IndexOf(args, "--capture");
-            if (capture >= 0 && capture + 1 < args.Length)
+            string? Argument(string name) { var i = Array.IndexOf(args, name); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
+            var view = Argument("--view") ?? "overview";
+            var hasTab = int.TryParse(Argument("--tab"), out var tab);
+            if (view != "overview" || hasTab)
+            {
+                var employee = Guid.TryParse(Argument("--employee-id"), out var id) ? workspace.Employees.FirstOrDefault(x => x.Id == id)
+                    : workspace.Employees.FirstOrDefault(x => x.Role.Contains("程序")) ?? workspace.Employees.FirstOrDefault();
+                if (employee != null)
+                {
+                    await workspace.OpenEmployeeAsync(employee.Id);
+                    if (view == "profile") EmployeePanel.ShowProfile();
+                    else if (view == "record")
+                    {
+                        var card = workspace.ActiveTimeline?.Cards.LastOrDefault();
+                        if (card != null) await workspace.OpenActivityAsync(card.Id);
+                        if (hasTab) EmployeePanel.ShowEditor(tab);
+                    }
+                    else if (hasTab) EmployeePanel.ShowEditor(tab);
+                }
+            }
+            var capture = Argument("--capture");
+            if (capture != null)
             {
                 for (var i = 0; workspace.IsBusy && i < 1200; i++) await Task.Delay(25);
                 await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
-                Capture(args[capture + 1]); Close();
+                if (workspace.HasError)
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(capture))!);
+                    File.WriteAllText(capture + ".error.txt", workspace.Status); Environment.ExitCode = 1;
+                }
+                else Capture(capture);
+                Close();
             }
         };
     }
-    private async void RoundSelected(object sender, RoutedPropertyChangedEventArgs<object> e)
+    private void ProjectChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.NewValue is RoundNode node && !_workspace.IsBusy) await _workspace.SelectRoundAsync(node.Id);
+        if (e.PropertyName == nameof(WorkspaceViewModel.OverviewTitle) && _overviewProject != _workspace.SelectedProject?.Id)
+        { _overviewProject = _workspace.SelectedProject?.Id; OverviewPanel.ResetPosition(); }
     }
-    private void GoCompose(object sender, RoutedEventArgs e) => EditorTabs.SelectedIndex = 0;
-    private async void EditorTabChanged(object sender, SelectionChangedEventArgs e)
+    private void OpenSettings(object sender, RoutedEventArgs e)
     {
-        if (ReferenceEquals(e.Source, EditorTabs) && EditorTabs.SelectedIndex == 3 && !_workspace.IsBusy) await _workspace.PrepareComparisonAsync();
-    }
-    private void ClearSearch(object sender, RoutedEventArgs e)
-    { _workspace.SearchEmployee = null; _workspace.SearchText = ""; _workspace.SearchTag = ""; _workspace.SearchState = _workspace.SearchStates[0]; }
-    private async void OpenSearchResult(object sender, MouseButtonEventArgs e)
-    {
-        if (sender is ListBox { SelectedItem: RoundDto row })
-        { await _workspace.OpenRoundAsync(row); EditorTabs.SelectedIndex = 1; }
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem { Header = "连接设置", Command = _workspace.ConnectionCommand });
+        menu.Items.Add(new MenuItem { Header = "API Key 与项目权限", Command = _workspace.KeysCommand });
+        menu.PlacementTarget = (UIElement)sender; menu.IsOpen = true;
     }
     public void Capture(string path)
     {

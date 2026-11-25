@@ -37,6 +37,9 @@ public sealed record RoundDto(Guid Id, Guid ProjectId, Guid ChainId, Guid Employ
     public string Label => $"#{Number:00} · {EmployeeSnapshot.Name}";
 }
 public sealed record PageDto<T>(T[] Items, int Total, int Skip, int Take);
+public sealed record ActivityDto(Guid Id, Guid ProjectId, Guid ChainId, string ChainName, Guid EmployeeId,
+    int Number, string InputPreview, string OutputPreview, RoundState Status, int Version, DateTime CreatedUtc,
+    Guid? ParentRoundId, Guid? RevisesRoundId);
 public sealed record RoundSaved(RoundDto Round, bool Replayed);
 public sealed record ContextDto(ProjectDto Project, ChainDto Chain, EmployeeDto Employee,
     RoundDto[] Ancestors, RoundDto[] References, string CompiledContext);

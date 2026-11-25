@@ -30,6 +30,7 @@ public sealed class DesktopSettings
     public string KeyFile { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PromptCrew", "personal", "admin.key");
     public Guid? ProjectId { get; set; }
     public Guid? ChainId { get; set; }
+    public Guid? EmployeeId { get; set; }
     public Dictionary<string, EditorDraft> Drafts { get; set; } = [];
     [System.Text.Json.Serialization.JsonIgnore] public string Warning { get; internal set; } = "";
     [System.Text.Json.Serialization.JsonIgnore] public string FilePath { get; set; } =

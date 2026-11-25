@@ -112,6 +112,7 @@ public sealed partial class WorkspaceViewModel
         var refs = Split(DraftReferences).Select(s => Guid.TryParse(s, out var id) ? id : throw new ArgumentException("成果引用须填写有效轮次 GUID。")).ToArray();
         var context = await _api.Context(_project.Id, _chain.Id, _employee.Id, _draft.ParentId, refs);
         CompiledContext = context.CompiledContext;
+        ContextHeading = "草稿上下文 · " + ParentLabel;
         Status = $"已提取 {context.Ancestors.Length} 个祖先节点和 {context.References.Length} 个显式引用；不包含兄弟分支。";
     }
     private async Task Search()
@@ -121,19 +122,8 @@ public sealed partial class WorkspaceViewModel
         Replace(SearchResults, page.Items);
         Status = $"找到 {page.Total} 轮记录" + (page.Total > page.Items.Length ? $"，当前显示前 {page.Items.Length} 轮。" : "。");
     }
-    public Task OpenRoundAsync(RoundDto row) => RunAsync(async () =>
-    {
-        if (_project?.Id != row.ProjectId) throw new InvalidOperationException("请先切换到记录所属项目。");
-        if (_chain?.Id != row.ChainId)
-        {
-            if (HasPending) throw new InvalidOperationException("请先确认待保存请求，再打开其他任务链。");
-            _loading = true;
-            try { SelectedChain = Chains.FirstOrDefault(x => x.Id == row.ChainId); }
-            finally { _loading = false; }
-            await LoadChain();
-        }
-        await SelectRoundCore(row.Id);
-    });
+    public Task OpenRoundAsync(RoundDto row) => _project?.Id == row.ProjectId ? OpenActivityAsync(row.Id)
+        : RunAsync(() => throw new InvalidOperationException("请先切换到记录所属项目。"));
     public async Task PrepareComparisonAsync()
     {
         if (_project == null) return;

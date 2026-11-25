@@ -89,7 +89,6 @@ internal static class Program
             {
                 Directory.CreateDirectory(capture);
                 image = Path.Combine(capture, "desktop.png");
-                desktopStart.ArgumentList.Add("--tab"); desktopStart.ArgumentList.Add("1");
                 desktopStart.ArgumentList.Add("--capture"); desktopStart.ArgumentList.Add(image);
             }
             using var desktop = Process.Start(desktopStart) ?? throw new InvalidOperationException("无法打开桌面界面。");

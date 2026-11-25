@@ -41,7 +41,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         SaveResultCommand = new(() => RunAsync(SaveResult), () => CanSaveResult);
         ResolvePendingCommand = new(() => RunAsync(ResolvePending), () => !IsBusy && HasPending);
         ContinueCommand = new(_ => Continue(false), () => !IsBusy && _round != null && !HasPending);
-        ReviseCommand = new(_ => Continue(true), () => !IsBusy && _round != null && !HasPending);
+        ReviseCommand = new(_ => Continue(true), () => !IsBusy && _round != null && !HasPending && (_activeEmployee == null || _round.EmployeeId == _activeEmployee.Id));
         RootCommand = new(_ => { _draft.ParentId = null; _draft.RevisesId = null; NotifyDraft(); ScheduleSave(); }, () => CanEditDraft);
         ContextCommand = new(() => RunAsync(LoadContext), () => !IsBusy && _chain != null && _employee != null);
         SearchCommand = new(() => RunAsync(Search), () => !IsBusy && _project != null);
@@ -54,6 +54,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         EditChainCommand = new(_ => EditRequested?.Invoke(CatalogSection.Chain, true), () => CanEditCatalog && _chain != null);
         ConnectionCommand = new(_ => ConnectionRequested?.Invoke(), () => !IsBusy);
         KeysCommand = new(_ => KeysRequested?.Invoke(), () => IsAdmin && !IsBusy);
+        InitializeNavigation();
         _saveTimer.Tick += (_, _) => { _saveTimer.Stop(); Persist(); };
         _searchState = SearchStates[0];
     }
@@ -184,6 +185,8 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     }
     private async Task LoadProject()
     {
+        var previousEmployee = _activeEmployee;
+        if (previousEmployee != null && previousEmployee.ProjectId != _project?.Id) { _activeEmployee = null; _employeeChains.Clear(); SetOverview(true); }
         _settings.ProjectId = _project?.Id;
         _loading = true;
         try
@@ -191,9 +194,14 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
             Replace(Employees, _project == null ? [] : await _api.Employees(_project.Id));
             Replace(Chains, _project == null ? [] : await _api.Chains(_project.Id));
             SelectedChain = Chains.FirstOrDefault(x => x.Id == _settings.ChainId) ?? Chains.FirstOrDefault();
+            var employeeId = _activeEmployee?.Id ?? _settings.EmployeeId;
+            if (_chain != null && _settings.Drafts.TryGetValue(_settings.ApiUrl.TrimEnd('/').ToLowerInvariant() + "|" + _chain.Id, out var legacy)
+                && (!Employees.Any(x => x.Id == employeeId) || legacy.PendingRound != null || legacy.PendingResult != null)) employeeId = legacy.EmployeeId;
+            SetActiveEmployee(Employees.FirstOrDefault(x => x.Id == employeeId) ?? Employees.OrderBy(x => x.CreatedUtc).FirstOrDefault());
         }
         finally { _loading = false; }
         SearchResults.Clear(); _searchEmployee = null; OnPropertyChanged(nameof(SearchEmployee));
+        await LoadActivity();
         await LoadChain();
     }
     private async Task LoadChain()
@@ -201,25 +209,34 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         _settings.ChainId = _chain?.Id;
         if (_chain != null)
         {
-            var key = _settings.ApiUrl.TrimEnd('/').ToLowerInvariant() + "|" + _chain.Id;
-            if (!_settings.Drafts.TryGetValue(key, out var draft)) _settings.Drafts[key] = draft = new();
+            var legacyKey = _settings.ApiUrl.TrimEnd('/').ToLowerInvariant() + "|" + _chain.Id;
+            var key = legacyKey + "|" + _activeEmployee?.Id;
+            if (!_settings.Drafts.TryGetValue(key, out var draft))
+            {
+                if (_settings.Drafts.TryGetValue(legacyKey, out var legacy) && (legacy.EmployeeId == _activeEmployee?.Id || legacy.EmployeeId == null))
+                { draft = legacy; _settings.Drafts.Remove(legacyKey); }
+                else draft = new();
+                _settings.Drafts[key] = draft;
+            }
             _draft = draft;
+            if (_activeEmployee != null) _employeeChains[_activeEmployee.Id] = _chain.Id;
         }
         else _draft = new();
         _loading = true;
-        try { SelectedEmployee = Employees.FirstOrDefault(x => x.Id == _draft.EmployeeId) ?? Employees.FirstOrDefault(x => x.IsActive) ?? Employees.FirstOrDefault(); }
+        try { SelectedEmployee = _activeEmployee ?? Employees.FirstOrDefault(x => x.Id == _draft.EmployeeId) ?? Employees.FirstOrDefault(x => x.IsActive) ?? Employees.FirstOrDefault(); }
         finally { _loading = false; }
         _draft.EmployeeId = _employee?.Id;
         _round = null; OnPropertyChanged(nameof(SelectedRound));
+        SelectedResultVersion = null;
         if (_project != null && _chain != null)
         {
             _graph = await _api.Graph(_project.Id, _chain.Id); BuildTree();
-            if (_draft.ResultRoundId.HasValue && _graph.Nodes.Any(x => x.Id == _draft.ResultRoundId))
+            if (_draft.ResultRoundId.HasValue && _graph.Nodes.Any(x => x.Id == _draft.ResultRoundId && x.EmployeeId == _employee?.Id))
                 await SelectRoundCore(_draft.ResultRoundId.Value);
-            else if (_graph.Nodes.LastOrDefault() is { } last) await SelectRoundCore(last.Id);
+            else if (_graph.Nodes.LastOrDefault(x => x.EmployeeId == _employee?.Id) is { } last) await SelectRoundCore(last.Id);
         }
         else { _graph = null; Roots.Clear(); }
-        ComparisonOptions.Clear(); CompiledContext = ""; NotifyDraft(); NotifyState(); Persist();
+        ComparisonOptions.Clear(); ComparisonTarget = null; CompiledContext = ""; ContextHeading = "当前分支上下文"; NotifyDraft(); NotifyState(); Persist();
     }
     private async Task ReloadGraph(Guid? select = null)
     {
@@ -230,6 +247,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         try { Replace(Chains, await _api.Chains(_project.Id)); SelectedChain = Chains.FirstOrDefault(x => x.Id == chainId); }
         finally { _loading = false; }
         if (select.HasValue) await SelectRoundCore(select.Value);
+        await LoadActivity();
         NotifyState();
     }
     private void BuildTree()
@@ -270,11 +288,12 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         if (section == CatalogSection.Project) { _settings.ProjectId = id; _project = null; }
         if (section == CatalogSection.Chain) _settings.ChainId = id;
         await RefreshAll();
-        if (section == CatalogSection.Employee) SelectedEmployee = Employees.FirstOrDefault(x => x.Id == id);
+        if (section == CatalogSection.Employee) await OpenEmployeeAsync(id);
     }
     private static void Replace<T>(ObservableCollection<T> list, IEnumerable<T> values) { list.Clear(); foreach (var value in values) list.Add(value); }
     private void NotifyState()
     {
+        NotifyNavigation();
         foreach (var p in new[] { nameof(IsIdle), nameof(HasPending), nameof(CanSelectWorkspace), nameof(CanEditDraft), nameof(CanEditCatalog), nameof(CanSaveRound), nameof(CanSaveResult), nameof(HasProject), nameof(HasChain), nameof(HasRound),
             nameof(SaveRoundLabel), nameof(SaveResultLabel), nameof(ProjectSummary), nameof(ProjectContext), nameof(EmployeeDescription), nameof(ChainSummary), nameof(CountLabel), nameof(ParentLabel), nameof(CurrentEmployeeLabel), nameof(RevisionLabel), nameof(RecordTitle), nameof(RecordMetadata), nameof(RecordInput), nameof(RecordBasePrompt), nameof(HistoricalOutput), nameof(HistoricalNote) }) OnPropertyChanged(p);
         foreach (var c in new[] { RefreshCommand, SaveRoundCommand, SaveResultCommand, ResolvePendingCommand, ContextCommand, SearchCommand, CompareCommand }) c?.RaiseCanExecuteChanged();

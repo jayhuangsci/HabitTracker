@@ -67,6 +67,7 @@ public sealed class CrewClient : IDisposable
     public Task<ChainDto[]> Chains(Guid p) => Send<ChainDto[]>(HttpMethod.Get, $"api/projects/{p}/chains");
     public Task<ChainDto> SaveChain(Guid p, Guid? id, ChainInput body) => Send<ChainDto>(id.HasValue ? HttpMethod.Put : HttpMethod.Post, $"api/projects/{p}/chains" + (id.HasValue ? "/" + id : ""), body);
     public Task<GraphDto> Graph(Guid p, Guid c) => Send<GraphDto>(HttpMethod.Get, $"api/projects/{p}/chains/{c}/graph");
+    public Task<ActivityDto[]> Activity(Guid p) => Send<ActivityDto[]>(HttpMethod.Get, $"api/projects/{p}/activity");
     public Task<RoundDto> Round(Guid p, Guid r) => Send<RoundDto>(HttpMethod.Get, $"api/projects/{p}/rounds/{r}");
     public Task<RoundDto> ByRequest(Guid p, Guid r) => Send<RoundDto>(HttpMethod.Get, $"api/projects/{p}/rounds/by-request/{r}");
     public Task<RoundSaved> SaveRound(Guid p, Guid c, RoundInput body) => Send<RoundSaved>(HttpMethod.Post, $"api/projects/{p}/chains/{c}/rounds", body);
