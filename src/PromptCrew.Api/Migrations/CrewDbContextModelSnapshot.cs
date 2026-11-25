@@ -215,11 +215,11 @@ namespace PromptCrew.Api.Migrations
                     b.HasIndex("ProjectId", "ClientRequestId")
                         .IsUnique();
 
-                    b.HasIndex("ProjectId", "EmployeeId");
-
                     b.HasIndex("ProjectId", "ChainId", "ParentRoundId");
 
                     b.HasIndex("ProjectId", "ChainId", "RevisesRoundId");
+
+                    b.HasIndex("ProjectId", "EmployeeId", "CreatedUtc", "Id");
 
                     b.ToTable("Rounds");
                 });

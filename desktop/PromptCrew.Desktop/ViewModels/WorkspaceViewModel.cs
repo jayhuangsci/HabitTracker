@@ -57,8 +57,9 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         InitializeNavigation();
         _saveTimer.Tick += (_, _) => { _saveTimer.Stop(); Persist(); };
         _searchState = SearchStates[0];
+        NotifyState();
     }
-    private CrewClient Connect() => new(_settings.ApiUrl, () => CrewClient.ReadKeyFile(_settings.KeyFile));
+    private CrewClient Connect() => new(_settings.ApiUrl, () => CrewClient.ReadKeyFile(_settings.KeyFile), TimeSpan.FromSeconds(_settings.TimeoutSeconds));
     public CrewClient Api => _api;
     public DesktopSettings Settings => _settings;
     public ObservableCollection<ProjectDto> Projects { get; } = [];
@@ -78,8 +79,8 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     public bool HasChain => _chain != null;
     public bool HasRound => _round != null;
     public bool IsIdle => !IsBusy;
-    public bool HasPending => _draft.PendingRound != null || _draft.PendingResult != null;
-    public bool CanSelectWorkspace => !IsBusy && !HasPending;
+    public bool HasPending => _draft.PendingRound != null || _draft.PendingResult != null || _draft.NewTaskId != null;
+    public bool CanSelectWorkspace => (!IsBusy || _navigating) && !HasPending;
     public bool CanEditDraft => !IsBusy && !HasPending && _chain != null;
     public bool CanEditCatalog => !IsBusy && _project != null && !HasPending;
     public bool CanSaveRound => !IsBusy && _project != null && _chain != null && _employee != null
@@ -112,12 +113,12 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     public ProjectDto? SelectedProject
     {
         get => _project;
-        set { if (!SetProperty(ref _project, value)) return; NotifyState(); if (!_loading) _ = RunAsync(LoadProject); }
+        set { if (!_loading && !CanSelectWorkspace) return; if (!SetProperty(ref _project, value)) return; NotifyState(); if (!_loading) _ = NavigateAsync(LoadProject); }
     }
     public ChainDto? SelectedChain
     {
         get => _chain;
-        set { if (!SetProperty(ref _chain, value)) return; NotifyState(); if (!_loading) _ = RunAsync(LoadChain); }
+        set { if (!_loading && !CanSelectWorkspace) return; if (!SetProperty(ref _chain, value)) return; NotifyState(); if (!_loading) _ = NavigateAsync(LoadChain); }
     }
     public EmployeeDto? SelectedEmployee
     {
@@ -152,33 +153,15 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     public RelayCommand KeysCommand { get; }
 
     public Task InitializeAsync() => RunAsync(RefreshAll);
-    public async Task ChangeConnection(string url, string keyFile)
-    {
-        _ = CrewClient.Address(url);
-        if (HasPending && !string.Equals(_settings.ApiUrl.TrimEnd('/'), url.TrimEnd('/'), StringComparison.OrdinalIgnoreCase))
-            throw new InvalidOperationException("先确认待保存的请求，再切换到其他服务。");
-        var candidate = new CrewClient(url, () => CrewClient.ReadKeyFile(keyFile));
-        try { await candidate.Session(); }
-        catch { candidate.Dispose(); throw; }
-        _api.Dispose(); _api = candidate; _settings.ApiUrl = url; _settings.KeyFile = keyFile;
-        await RunAsync(RefreshAll);
-    }
-    private async Task RunAsync(Func<Task> action)
-    {
-        if (IsBusy || _disposed) return;
-        IsBusy = true; HasError = false; Status = "正在更新工作台…";
-        try { await action(); if (Status == "正在更新工作台…") Status = "工作台已更新。"; }
-        catch (Exception e) when (e is CrewApiException or HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
-        { HasError = true; Status = e is HttpRequestException or TaskCanceledException ? "无法连接服务。请检查连接设置；草稿和待确认请求会保留。" : e.Message; }
-        finally { IsBusy = false; }
-    }
     private async Task RefreshAll()
     {
-        var session = await _api.Session(); IsAdmin = session.IsAdmin;
-        Replace(Templates, await _api.Templates());
+        var session = await Read(ct => _api.Session(ct)); IsAdmin = session.IsAdmin;
+        ConnectionState = "已连接";
+        Replace(Templates, await Read(ct => _api.Templates(ct)));
         var old = _project?.Id ?? _settings.ProjectId;
+        var projects = await Read(ct => _api.Projects(ct));
         _loading = true;
-        try { Replace(Projects, await _api.Projects()); SelectedProject = Projects.FirstOrDefault(x => x.Id == old) ?? Projects.FirstOrDefault(); }
+        try { Replace(Projects, projects); SelectedProject = Projects.FirstOrDefault(x => x.Id == old) ?? Projects.FirstOrDefault(); }
         finally { _loading = false; }
         await LoadProject(); Persist();
         Status = "已连接 · " + session.Name + " · 草稿保存在此设备";
@@ -188,12 +171,17 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         var previousEmployee = _activeEmployee;
         if (previousEmployee != null && previousEmployee.ProjectId != _project?.Id) { _activeEmployee = null; _employeeChains.Clear(); SetOverview(true); }
         _settings.ProjectId = _project?.Id;
+        var projectId = _project?.Id;
+        var employees = projectId == null ? [] : await Read(ct => _api.Employees(projectId.Value, ct));
+        var chains = projectId == null ? [] : await Read(ct => _api.Chains(projectId.Value, ct));
         _loading = true;
         try
         {
-            Replace(Employees, _project == null ? [] : await _api.Employees(_project.Id));
-            Replace(Chains, _project == null ? [] : await _api.Chains(_project.Id));
-            SelectedChain = Chains.FirstOrDefault(x => x.Id == _settings.ChainId) ?? Chains.FirstOrDefault();
+            Replace(Employees, employees);
+            Replace(Chains, chains);
+            var looseKey = _settings.ApiUrl.TrimEnd('/').ToLowerInvariant() + "|new|" + _settings.EmployeeId;
+            var hasLooseDraft = _settings.ChainId == null && _settings.Drafts.TryGetValue(looseKey, out var loose) && (loose.Input.Length > 0 || loose.NewTaskId != null);
+            SelectedChain = hasLooseDraft ? null : Chains.FirstOrDefault(x => x.Id == _settings.ChainId) ?? Chains.FirstOrDefault();
             var employeeId = _activeEmployee?.Id ?? _settings.EmployeeId;
             if (_chain != null && _settings.Drafts.TryGetValue(_settings.ApiUrl.TrimEnd('/').ToLowerInvariant() + "|" + _chain.Id, out var legacy)
                 && (!Employees.Any(x => x.Id == employeeId) || legacy.PendingRound != null || legacy.PendingResult != null)) employeeId = legacy.EmployeeId;
@@ -221,7 +209,12 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
             _draft = draft;
             if (_activeEmployee != null) _employeeChains[_activeEmployee.Id] = _chain.Id;
         }
-        else _draft = new();
+        else
+        {
+            var key = _settings.ApiUrl.TrimEnd('/').ToLowerInvariant() + "|new|" + _activeEmployee?.Id;
+            if (!_settings.Drafts.TryGetValue(key, out var draft)) _settings.Drafts[key] = draft = new();
+            _draft = draft;
+        }
         _loading = true;
         try { SelectedEmployee = _activeEmployee ?? Employees.FirstOrDefault(x => x.Id == _draft.EmployeeId) ?? Employees.FirstOrDefault(x => x.IsActive) ?? Employees.FirstOrDefault(); }
         finally { _loading = false; }
@@ -230,7 +223,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         SelectedResultVersion = null;
         if (_project != null && _chain != null)
         {
-            _graph = await _api.Graph(_project.Id, _chain.Id); BuildTree();
+            _graph = await Read(ct => _api.Graph(_project.Id, _chain.Id, ct)); BuildTree();
             if (_draft.ResultRoundId.HasValue && _graph.Nodes.Any(x => x.Id == _draft.ResultRoundId && x.EmployeeId == _employee?.Id))
                 await SelectRoundCore(_draft.ResultRoundId.Value);
             else if (_graph.Nodes.LastOrDefault(x => x.EmployeeId == _employee?.Id) is { } last) await SelectRoundCore(last.Id);
@@ -241,10 +234,11 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     private async Task ReloadGraph(Guid? select = null)
     {
         if (_project == null || _chain == null) return;
-        _graph = await _api.Graph(_project.Id, _chain.Id); BuildTree();
+        _graph = await Read(ct => _api.Graph(_project.Id, _chain.Id, ct)); BuildTree();
         var chainId = _chain.Id;
+        var chains = await Read(ct => _api.Chains(_project.Id, ct));
         _loading = true;
-        try { Replace(Chains, await _api.Chains(_project.Id)); SelectedChain = Chains.FirstOrDefault(x => x.Id == chainId); }
+        try { Replace(Chains, chains); SelectedChain = Chains.FirstOrDefault(x => x.Id == chainId); }
         finally { _loading = false; }
         if (select.HasValue) await SelectRoundCore(select.Value);
         await LoadActivity();
@@ -265,7 +259,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     private async Task SelectRoundCore(Guid id)
     {
         if (_project == null) return;
-        var row = await _api.Round(_project.Id, id); _round = row;
+        var row = await Read(ct => _api.Round(_project.Id, id, ct)); _round = row;
         RightOutputVersion = 0; OnPropertyChanged(nameof(RightOutputVersions));
         void SelectNode(IEnumerable<RoundNode> nodes)
         { foreach (var node in nodes) { node.IsSelected = node.Id == id; SelectNode(node.Children); } }
@@ -287,12 +281,14 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     {
         if (section == CatalogSection.Project) { _settings.ProjectId = id; _project = null; }
         if (section == CatalogSection.Chain) _settings.ChainId = id;
-        await RefreshAll();
+        await RunAsync(RefreshAll);
         if (section == CatalogSection.Employee) await OpenEmployeeAsync(id);
     }
     private static void Replace<T>(ObservableCollection<T> list, IEnumerable<T> values) { list.Clear(); foreach (var value in values) list.Add(value); }
     private void NotifyState()
     {
+        NotifyConnection();
+        NotifyQuickCapture();
         NotifyNavigation();
         foreach (var p in new[] { nameof(IsIdle), nameof(HasPending), nameof(CanSelectWorkspace), nameof(CanEditDraft), nameof(CanEditCatalog), nameof(CanSaveRound), nameof(CanSaveResult), nameof(HasProject), nameof(HasChain), nameof(HasRound),
             nameof(SaveRoundLabel), nameof(SaveResultLabel), nameof(ProjectSummary), nameof(ProjectContext), nameof(EmployeeDescription), nameof(ChainSummary), nameof(CountLabel), nameof(ParentLabel), nameof(CurrentEmployeeLabel), nameof(RevisionLabel), nameof(RecordTitle), nameof(RecordMetadata), nameof(RecordInput), nameof(RecordBasePrompt), nameof(HistoricalOutput), nameof(HistoricalNote) }) OnPropertyChanged(p);
@@ -308,5 +304,5 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { HasError = true; Status = "草稿未能写入设备：" + e.Message; }
     }
     private void PersistRequired() { _saveTimer.Stop(); _settings.Save(); }
-    public void Dispose() { if (_disposed) return; Persist(); _disposed = true; _saveTimer.Stop(); _api.Dispose(); }
+    public void Dispose() { if (_disposed) return; Persist(); _disposed = true; _operationSource?.Cancel(); _saveTimer.Stop(); _api.Dispose(); }
 }

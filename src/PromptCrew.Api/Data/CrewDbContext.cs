@@ -38,6 +38,7 @@ public sealed class CrewDbContext(DbContextOptions<CrewDbContext> options) : DbC
             e.HasAlternateKey(x => new { x.ProjectId, x.ChainId, x.Id });
             e.HasIndex(x => new { x.ProjectId, x.ClientRequestId }).IsUnique();
             e.HasIndex(x => new { x.ChainId, x.Number }).IsUnique();
+            e.HasIndex(x => new { x.ProjectId, x.EmployeeId, x.CreatedUtc, x.Id });
             e.HasOne<TaskChain>().WithMany().HasForeignKey(x => new { x.ProjectId, x.ChainId })
                 .HasPrincipalKey(x => new { x.ProjectId, x.Id }).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Employee>().WithMany().HasForeignKey(x => new { x.ProjectId, x.EmployeeId })

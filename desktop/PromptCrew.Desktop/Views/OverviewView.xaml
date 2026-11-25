@@ -6,20 +6,21 @@
    <TextBlock Text="{Binding ProjectSummary}" Style="{StaticResource Caption}" FontSize="12" MaxHeight="36" Margin="0,9,0,0"/>
    <TextBlock Text="每列是一名员工的工作记录，按时间从上到下连接。点击卡片查看完整内容。" Style="{StaticResource Caption}" Margin="0,9,0,0"/>
   </StackPanel>
-  <ScrollViewer Grid.Row="1" x:Name="HistoryScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" PanningMode="Both" Visibility="{Binding HasTeam,Converter={StaticResource Visible}}">
+  <ScrollViewer Grid.Row="1" x:Name="HistoryScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PanningMode="HorizontalOnly" Visibility="{Binding HasTeam,Converter={StaticResource Visible}}">
    <ItemsControl ItemsSource="{Binding EmployeeTimelines}" Margin="0,0,0,12">
     <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
     <ItemsControl.ItemTemplate><DataTemplate>
-     <StackPanel Width="252" Margin="0,0,14,0">
+     <Grid Width="270" Margin="0,0,14,0" Height="{Binding ActualHeight,RelativeSource={RelativeSource AncestorType=ScrollContentPresenter}}"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
       <Button Command="{Binding DataContext.OpenEmployeeCommand,RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Id}" Style="{StaticResource LaneHeader}" AutomationProperties.Name="{Binding Name}">
        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel><TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold"/><TextBlock Text="{Binding Role}" Style="{StaticResource Caption}" Margin="0,6,0,0"/><TextBlock Text="{Binding CountLabel}" Style="{StaticResource Caption}" Margin="0,9,0,0"/></StackPanel>
         <TextBlock Grid.Column="1" Text="↗" Foreground="#73866A" FontSize="16"/>
        </Grid>
       </Button>
-      <ItemsControl ItemsSource="{Binding Cards}" ItemTemplate="{StaticResource ActivityCardTemplate}"/>
-      <Border Background="#EDF1E7" CornerRadius="9" Padding="18" Margin="18,0,0,0" Visibility="{Binding IsEmpty,Converter={StaticResource Visible}}"><TextBlock Text="暂无工作记录。点击员工，开始记录第一轮工作。" Style="{StaticResource Caption}"/></Border>
-     </StackPanel>
+      <ListBox Grid.Row="1" ItemsSource="{Binding Cards}" ItemTemplate="{StaticResource ActivityCardTemplate}" Style="{StaticResource HistoryList}"/>
+      <Button Grid.Row="2" Content="加载更早记录" Command="{Binding DataContext.LoadOlderCommand,RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding Id}" Style="{StaticResource Quiet}" Visibility="{Binding HasMore,Converter={StaticResource Visible}}"/>
+      <Border Grid.Row="1" VerticalAlignment="Top" Background="#EDF1E7" CornerRadius="9" Padding="18" Margin="18,0,0,0" Visibility="{Binding IsEmpty,Converter={StaticResource Visible}}"><TextBlock Text="暂无记录。点击左侧员工旁的 +，记录第一轮提示词。" Style="{StaticResource Caption}"/></Border>
+     </Grid>
     </DataTemplate></ItemsControl.ItemTemplate>
    </ItemsControl>
   </ScrollViewer>

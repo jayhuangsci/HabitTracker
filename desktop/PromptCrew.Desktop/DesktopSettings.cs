@@ -23,6 +23,8 @@ public sealed class EditorDraft
     public RoundInput? PendingRound { get; set; }
     public ResultInput? PendingResult { get; set; }
     public Guid? PendingResultRoundId { get; set; }
+    public string NewTaskName { get; set; } = "";
+    public Guid? NewTaskId { get; set; }
 }
 public sealed class DesktopSettings
 {
@@ -31,6 +33,8 @@ public sealed class DesktopSettings
     public Guid? ProjectId { get; set; }
     public Guid? ChainId { get; set; }
     public Guid? EmployeeId { get; set; }
+    public int TimeoutSeconds { get; set; } = 20;
+    public bool ReduceMotion { get; set; }
     public Dictionary<string, EditorDraft> Drafts { get; set; } = [];
     [System.Text.Json.Serialization.JsonIgnore] public string Warning { get; internal set; } = "";
     [System.Text.Json.Serialization.JsonIgnore] public string FilePath { get; set; } =
@@ -45,6 +49,7 @@ public sealed class DesktopSettings
             {
                 var loaded = JsonSerializer.Deserialize<DesktopSettings>(File.ReadAllText(defaults.FilePath), CrewJson.Options);
                 if (loaded == null || loaded.Drafts == null) throw new JsonException();
+                loaded.TimeoutSeconds = Math.Clamp(loaded.TimeoutSeconds, 1, 120);
                 loaded.FilePath = defaults.FilePath; return loaded;
             }
         }

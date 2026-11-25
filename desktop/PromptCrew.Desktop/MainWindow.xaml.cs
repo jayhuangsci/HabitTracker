@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using System.Windows.Input;
 using PromptCrew.Desktop.ViewModels;
 
 namespace PromptCrew.Desktop;
@@ -22,6 +23,16 @@ public partial class MainWindow : Window
         workspace.OverviewShown += OverviewPanel.RestorePosition;
         workspace.EmployeeOpened += EmployeePanel.ShowHistory;
         workspace.RecordOpened += () => EmployeePanel.ShowEditor(1);
+        workspace.QuickCaptureOpened += QuickPanel.FocusPrompt;
+        SizeChanged += (_, _) => { Tagline.Visibility = ActualWidth >= 1250 ? Visibility.Visible : Visibility.Collapsed; };
+        PreviewKeyDown += (_, e) =>
+        {
+            if (!workspace.IsQuickCaptureOpen) return;
+            if (e.Key == Key.Escape && workspace.CloseQuickCaptureCommand.CanExecute(null))
+            { workspace.CloseQuickCaptureCommand.Execute(null); e.Handled = true; }
+            else if (e.Key == Key.Enter && Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && workspace.SaveQuickCommand.CanExecute(null))
+            { workspace.SaveQuickCommand.Execute(null); e.Handled = true; }
+        };
         workspace.PropertyChanged += ProjectChanged;
         Closing += (_, _) =>
         {
@@ -49,6 +60,7 @@ public partial class MainWindow : Window
                         if (card != null) await workspace.OpenActivityAsync(card.Id);
                         if (hasTab) EmployeePanel.ShowEditor(tab);
                     }
+                    else if (view == "quick") await workspace.OpenQuickCaptureAsync(employee.Id);
                     else if (hasTab) EmployeePanel.ShowEditor(tab);
                 }
             }
@@ -77,6 +89,8 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(new MenuItem { Header = "连接设置", Command = _workspace.ConnectionCommand });
         menu.Items.Add(new MenuItem { Header = "API Key 与项目权限", Command = _workspace.KeysCommand });
+        var motion = new MenuItem { Header = "减少动画", IsCheckable = true, IsChecked = _workspace.ReduceMotion };
+        motion.Click += (_, _) => _workspace.ReduceMotion = motion.IsChecked; menu.Items.Add(motion);
         menu.PlacementTarget = (UIElement)sender; menu.IsOpen = true;
     }
     public void Capture(string path)

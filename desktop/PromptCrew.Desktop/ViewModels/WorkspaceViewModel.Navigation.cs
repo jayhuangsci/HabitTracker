@@ -27,7 +27,7 @@ public sealed partial class WorkspaceViewModel
     public string ActiveBasePrompt => _activeEmployee?.BasePrompt ?? "";
     public string ActiveSkills => string.Join(" / ", _activeEmployee?.Skills ?? []);
     public string OverviewTitle => _project?.Name ?? "项目总览";
-    public string OverviewSummary => $"{Employees.Count} 名员工 · {Chains.Count} 条任务链 · {_activities.Length} 轮工作记录";
+    public string OverviewSummary => $"{Employees.Count} 名员工 · {Chains.Count} 条任务链 · {EmployeeTimelines.Sum(x => x.Total)} 轮工作记录";
     public bool HasTeam => EmployeeTimelines.Count > 0;
     public bool HasNoTeam => !HasTeam;
     public bool HasNoProject => !HasProject;
@@ -41,6 +41,7 @@ public sealed partial class WorkspaceViewModel
     public AsyncRelayCommand RecordContextCommand { get; private set; } = null!;
     private void InitializeNavigation()
     {
+        LoadOlderCommand = new(value => { if (value is Guid id) _ = LoadOlder(id); }, () => !IsBusy);
         OverviewCommand = new(_ => GoOverview(), () => !IsBusy);
         ResumeWorkCommand = new(_ => { SetOverview(false); EmployeeOpened?.Invoke(); }, () => !IsBusy && _activeEmployee != null);
         OpenEmployeeCommand = new(value => { if (value is Guid id) _ = OpenEmployeeAsync(id); }, () => CanSelectWorkspace);
@@ -67,16 +68,42 @@ public sealed partial class WorkspaceViewModel
             nameof(ActiveResponsibilities), nameof(ActiveBasePrompt), nameof(ActiveSkills), nameof(OverviewTitle), nameof(OverviewSummary), nameof(HasTeam), nameof(HasNoTeam), nameof(HasNoProject),
             nameof(ParticipatingChains), nameof(HasParticipatingChains), nameof(RecordRelations) }) OnPropertyChanged(property);
         OverviewCommand?.RaiseCanExecuteChanged(); ResumeWorkCommand?.RaiseCanExecuteChanged(); RecordContextCommand?.RaiseCanExecuteChanged();
-        OpenEmployeeCommand?.RaiseCanExecuteChanged(); OpenActivityCommand?.RaiseCanExecuteChanged();
+        LoadOlderCommand?.RaiseCanExecuteChanged(); OpenEmployeeCommand?.RaiseCanExecuteChanged(); OpenActivityCommand?.RaiseCanExecuteChanged();
     }
+    public RelayCommand LoadOlderCommand { get; private set; } = null!;
     private async Task LoadActivity()
     {
-        _activities = _project == null ? [] : await _api.Activity(_project.Id);
-        Replace(EmployeeTimelines, Employees.OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id)
-            .Select(e => new EmployeeTimeline(e, _activities.Where(r => r.EmployeeId == e.Id))));
+        var project = _project;
+        if (project == null) { _activities = []; EmployeeTimelines.Clear(); NotifyNavigation(); return; }
+        using var limit = new SemaphoreSlim(3);
+        var token = OperationToken;
+        var lanes = await Task.WhenAll(Employees.OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id).Select(async employee =>
+        {
+            await limit.WaitAsync(token);
+            try
+            {
+                var page = await _api.ActivityPage(project.Id, employee.Id, ct: token);
+                token.ThrowIfCancellationRequested();
+                return new EmployeeTimeline(employee, page.Items, page.Total);
+            }
+            finally { limit.Release(); }
+        }));
+        token.ThrowIfCancellationRequested();
+        Replace(EmployeeTimelines, lanes);
+        _activities = lanes.SelectMany(x => x.Cards).Select(x => x.Record).OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id).ToArray();
         NotifyNavigation();
     }
-    public Task OpenEmployeeAsync(Guid id) => RunAsync(async () =>
+    private Task LoadOlder(Guid employeeId) => RunAsync(async () =>
+    {
+        var lane = EmployeeTimelines.FirstOrDefault(x => x.Id == employeeId);
+        if (_project == null || lane == null || !lane.HasMore) return;
+        var page = await Read(ct => _api.ActivityPage(_project.Id, employeeId, lane.Cards.Count, 50, ct));
+        var records = lane.Cards.Select(x => x.Record).Concat(page.Items).DistinctBy(x => x.Id).ToArray();
+        EmployeeTimelines[EmployeeTimelines.IndexOf(lane)] = new(lane.Employee, records, page.Total);
+        _activities = EmployeeTimelines.SelectMany(x => x.Cards).Select(x => x.Record).OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id).ToArray();
+        NotifyNavigation(); Status = "已加载更早的工作记录。";
+    });
+    public Task OpenEmployeeAsync(Guid id) => NavigateAsync(async () =>
     {
         var employee = Employees.FirstOrDefault(x => x.Id == id) ?? throw new InvalidOperationException("员工不属于当前项目。");
         if (HasPending && employee.Id != _employee?.Id) throw new InvalidOperationException("请先确认待保存的请求，再切换员工。");
@@ -92,10 +119,10 @@ public sealed partial class WorkspaceViewModel
         }
         SetOverview(false); EmployeeOpened?.Invoke();
     });
-    public Task OpenActivityAsync(Guid id) => RunAsync(async () =>
+    public Task OpenActivityAsync(Guid id) => NavigateAsync(async () =>
     {
         if (_project == null) return;
-        var row = await _api.Round(_project.Id, id);
+        var row = await Read(ct => _api.Round(_project.Id, id, ct));
         if (HasPending && (_employee?.Id != row.EmployeeId || _chain?.Id != row.ChainId))
             throw new InvalidOperationException("请先确认待保存请求，再打开其他员工或任务链。");
         if (_activeEmployee?.Id != row.EmployeeId || _chain?.Id != row.ChainId)
@@ -112,7 +139,7 @@ public sealed partial class WorkspaceViewModel
     private async Task LoadRecordContext()
     {
         if (_project == null || _round == null) return;
-        var context = await _api.Context(_project.Id, _round.ChainId, _round.EmployeeId, _round.Id);
+        var context = await Read(ct => _api.Context(_project.Id, _round.ChainId, _round.EmployeeId, _round.Id, ct: ct));
         CompiledContext = context.CompiledContext;
         ContextHeading = "本轮上下文 · " + _round.Label;
         Status = $"此轮上下文：{context.Ancestors.Length} 条祖先及当前记录，{context.References.Length} 个显式引用。";

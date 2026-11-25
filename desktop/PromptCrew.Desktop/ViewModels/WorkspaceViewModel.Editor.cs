@@ -53,6 +53,7 @@ public sealed partial class WorkspaceViewModel
         if (_project == null || _chain == null || _employee == null) return;
         if (_draft.PendingRound == null)
         {
+            _pendingAbsent = false;
             var references = Split(DraftReferences).Select(s => Guid.TryParse(s, out var id) ? id : throw new ArgumentException("成果引用须填写轮次 GUID，以逗号或换行分隔。")).ToArray();
             _draft.PendingRound = new RoundInput { ClientRequestId = Guid.NewGuid(), EmployeeId = _employee.Id,
                 ParentRoundId = _draft.ParentId, RevisesRoundId = _draft.RevisesId, Input = Rules.Text(DraftInput, "原始提示词", 100000, true),
@@ -60,9 +61,10 @@ public sealed partial class WorkspaceViewModel
                 ExpectedEmployeeVersion = _employee.Version };
         }
         PersistRequired(); NotifyState();
-        var saved = await _api.SaveRound(_project.Id, _chain.Id, _draft.PendingRound);
+        var saved = await _api.SaveRound(_project.Id, _chain.Id, _draft.PendingRound, OperationToken);
         _draft.PendingRound = null; _draft.Input = ""; _draft.Notes = ""; _draft.RevisesId = null; _draft.ParentId = saved.Round.Id;
-        PersistRequired(); await ReloadGraph(saved.Round.Id); NotifyDraft();
+        PersistRequired(); ApplySavedRound(saved.Round); NotifyDraft();
+        await RefreshSavedGraph(saved.Round.Id);
         Status = "输入已保存 · " + saved.Round.Id + (saved.Replayed ? " · 已确认原请求，无重复记录" : "");
     }
     private async Task SaveResult()
@@ -75,42 +77,67 @@ public sealed partial class WorkspaceViewModel
                 Output = DraftOutput, Status = ResultStatus, Artifacts = Split(DraftArtifacts), Note = ResultNote };
         }
         PersistRequired(); NotifyState();
-        var saved = await _api.SaveResult(_project.Id, _draft.PendingResultRoundId!.Value, _draft.PendingResult);
+        var saved = await _api.SaveResult(_project.Id, _draft.PendingResultRoundId!.Value, _draft.PendingResult, OperationToken);
         _draft.PendingResult = null; _draft.PendingResultRoundId = null; _draft.ResultNote = "";
-        PersistRequired(); await ReloadGraph(saved.Round.Id); NotifyDraft();
+        PersistRequired(); ApplySavedRound(saved.Round); NotifyDraft();
+        await RefreshSavedGraph(saved.Round.Id);
         Status = $"结果版本 v{saved.Round.Version} 已追加，历史版本保留。";
     }
     private async Task ResolvePending()
     {
         if (_project == null) return;
+        if (_draft.NewTaskId != null) { Status = "新任务请求已保留，请在快速记录面板重试保存。"; return; }
         if (_draft.PendingRound != null)
         {
             RoundDto? saved = null;
-            try { saved = await _api.ByRequest(_project.Id, _draft.PendingRound.ClientRequestId); }
+            try { saved = await Read(ct => _api.ByRequest(_project.Id, _draft.PendingRound.ClientRequestId, ct)); }
             catch (CrewApiException e) when (e.Status == 404) { }
-            _draft.PendingRound = null;
+            _pendingAbsent = saved == null;
             if (saved != null)
             {
+                _draft.PendingRound = null;
                 _draft.Input = ""; _draft.ParentId = saved.Id; _draft.RevisesId = null;
                 await ReloadGraph(saved.Id); Status = "已找到原请求的记录，保存已确认。";
             }
-            else Status = "服务中未找到该请求，已保留草稿供修改；下次保存将使用新请求 ID。";
+            else Status = "服务中未找到该请求。草稿和原请求 ID 保留，请重试同一输入。";
         }
         if (_draft.PendingResult != null && _draft.PendingResultRoundId.HasValue)
         {
-            var row = await _api.Round(_project.Id, _draft.PendingResultRoundId.Value);
+            var row = await Read(ct => _api.Round(_project.Id, _draft.PendingResultRoundId.Value, ct));
             var exists = row.Results.Any(x => x.ClientRequestId == _draft.PendingResult.ClientRequestId);
-            _draft.PendingResult = null; _draft.PendingResultRoundId = null;
+            _pendingAbsent = !exists;
+            if (exists) { _draft.PendingResult = null; _draft.PendingResultRoundId = null; }
             await SelectRoundCore(row.Id);
-            Status = exists ? "已找到原结果版本，保存已确认。" : "服务中未找到该结果请求，可修改草稿并重新追加。";
+            Status = exists ? "已找到原结果版本，保存已确认。" : "服务中未找到该结果请求。原请求 ID 保留，可重试同一结果。";
         }
         PersistRequired(); NotifyDraft();
+    }
+    private void ApplySavedRound(RoundDto row)
+    {
+        _round = row; SelectedResultVersion = row.Results.LastOrDefault();
+        var activity = new ActivityDto(row.Id, row.ProjectId, row.ChainId, _chain?.Name ?? "", row.EmployeeId, row.Number,
+            row.Input[..Math.Min(row.Input.Length, 160)], row.LatestOutput[..Math.Min(row.LatestOutput.Length, 220)],
+            row.Status, row.Version, row.CreatedUtc, row.ParentRoundId, row.RevisesRoundId);
+        var lane = EmployeeTimelines.FirstOrDefault(x => x.Id == row.EmployeeId);
+        if (lane != null)
+        {
+            var exists = lane.Cards.Any(x => x.Id == row.Id);
+            var records = lane.Cards.Where(x => x.Id != row.Id).Select(x => x.Record).Append(activity);
+            EmployeeTimelines[EmployeeTimelines.IndexOf(lane)] = new(lane.Employee, records, lane.Total + (exists ? 0 : 1));
+        }
+        OnPropertyChanged(nameof(SelectedRound)); NotifyNavigation();
+    }
+    private async Task RefreshSavedGraph(Guid roundId)
+    {
+        try { await ReloadGraph(roundId); }
+        catch (Exception e) when (e is HttpRequestException or OperationCanceledException or CrewApiException)
+        { ConnectionState = "记录已保存 · 刷新待重试"; }
     }
     private async Task LoadContext()
     {
         if (_project == null || _chain == null || _employee == null) return;
         var refs = Split(DraftReferences).Select(s => Guid.TryParse(s, out var id) ? id : throw new ArgumentException("成果引用须填写有效轮次 GUID。")).ToArray();
-        var context = await _api.Context(_project.Id, _chain.Id, _employee.Id, _draft.ParentId, refs);
+        var context = await Read(ct => _api.Context(_project.Id, _chain.Id, _employee.Id, _draft.ParentId, refs, ct));
         CompiledContext = context.CompiledContext;
         ContextHeading = "草稿上下文 · " + ParentLabel;
         Status = $"已提取 {context.Ancestors.Length} 个祖先节点和 {context.References.Length} 个显式引用；不包含兄弟分支。";
@@ -118,7 +145,7 @@ public sealed partial class WorkspaceViewModel
     private async Task Search()
     {
         if (_project == null) return;
-        var page = await _api.Search(_project.Id, new(SearchText, SearchEmployee?.Id, null, SearchTag, SearchState?.Value, 0, 200));
+        var page = await Read(ct => _api.Search(_project.Id, new(SearchText, SearchEmployee?.Id, null, SearchTag, SearchState?.Value, 0, 200), ct));
         Replace(SearchResults, page.Items);
         Status = $"找到 {page.Total} 轮记录" + (page.Total > page.Items.Length ? $"，当前显示前 {page.Items.Length} 轮。" : "。");
     }
@@ -129,7 +156,7 @@ public sealed partial class WorkspaceViewModel
         if (_project == null) return;
         await RunAsync(async () =>
         {
-            var page = await _api.Search(_project.Id, new(ChainId: _chain?.Id, Take: 200));
+            var page = await Read(ct => _api.Search(_project.Id, new(ChainId: _chain?.Id, Take: 200), ct));
             Replace(ComparisonOptions, page.Items);
             if (_round != null && !ComparisonOptions.Any(x => x.Id == _round.Id)) ComparisonOptions.Insert(0, _round);
             ComparisonTarget = page.Items.FirstOrDefault(x => x.Id == _round?.RevisesRoundId)
@@ -139,8 +166,8 @@ public sealed partial class WorkspaceViewModel
     private async Task Compare()
     {
         if (_project == null || _round == null || _compareTarget == null) return;
-        var result = await _api.Compare(_project.Id, _compareTarget.Id, _round.Id,
-            LeftOutputVersion == 0 ? null : LeftOutputVersion, RightOutputVersion == 0 ? null : RightOutputVersion);
+        var result = await Read(ct => _api.Compare(_project.Id, _compareTarget.Id, _round.Id,
+            LeftOutputVersion == 0 ? null : LeftOutputVersion, RightOutputVersion == 0 ? null : RightOutputVersion, ct));
         InputDiff = result.InputDiff; OutputDiff = result.OutputDiff;
         Status = $"比较 {_compareTarget.Label} v{result.LeftOutputVersion} → {_round.Label} v{result.RightOutputVersion}。";
     }

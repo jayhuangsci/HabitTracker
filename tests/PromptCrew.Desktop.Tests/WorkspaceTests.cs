@@ -97,6 +97,8 @@ public sealed class WorkspaceTests
                         Assert.Single((await api.Search(p.Id, new(Text: "服务已保存但响应丢失"))).Items);
                     }
                     await VerifyEmployeeOverview();
+                    await VerifyQuickCapture();
+                    await VerifyCancelledNavigation();
                     completion.SetResult();
                 }
                 catch (Exception e) { completion.TrySetException(e); }
@@ -208,6 +210,115 @@ public sealed class WorkspaceTests
         Assert.Equal(team[1].Id, migrated.ActiveEmployee!.Id); Assert.Equal("旧版程序员草稿", migrated.DraftInput);
         Assert.True(migrated.HasPending); Assert.DoesNotContain(oldKey, oldSettings.Drafts.Keys);
         Assert.Equal(retryId, Assert.Single(oldSettings.Drafts.Values).PendingRound!.ClientRequestId);
+    }
+    private static async Task VerifyQuickCapture()
+    {
+        using var app = new CrewFixture(); using var api = new CrewClient(app.Admin());
+        var project = await api.SaveProject(null, new() { Name = "快捷记录验收" });
+        var team = new List<EmployeeDto>();
+        foreach (var t in RoleTemplates.All.Take(2)) team.Add(await api.SaveEmployee(project.Id, null, new()
+        { Name = t.Name, Role = t.Role, Responsibilities = t.Responsibilities, BasePrompt = t.BasePrompt }));
+        var file = Path.Combine(app.DirectoryPath, "quick.json");
+        var handler = new FailBeforeWriteHandler { InnerHandler = app.Server.CreateHandler() };
+        var http = new HttpClient(handler) { BaseAddress = new("http://localhost/") };
+        http.DefaultRequestHeaders.Add("X-Api-Key", CrewFixture.TestKey);
+        Guid savedId;
+        using (var vm = new WorkspaceViewModel(new DesktopSettings { FilePath = file }, new CrewClient(http)))
+        {
+            await vm.InitializeAsync();
+            var window = new MainWindow(vm) { ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -10000, Top = -10000, Width = 940, Height = 700 };
+            window.Show(); await Dispatcher.CurrentDispatcher.InvokeAsync(() => { }, DispatcherPriority.ApplicationIdle);
+            while (vm.IsBusy) await Task.Delay(10);
+            window.UpdateLayout();
+            var plus = Visuals(window).OfType<Button>().Single(b => ReferenceEquals(b.Command, vm.QuickCaptureCommand) && b.CommandParameter is Guid id && id == team[1].Id && b.Content?.ToString() == "+");
+            plus.Command!.Execute(plus.CommandParameter); while (vm.IsBusy) await Task.Delay(10);
+            Assert.True(vm.IsQuickCaptureOpen); Assert.Equal(team[1].Id, vm.SelectedEmployee!.Id); Assert.True(vm.IsNewTask);
+            async Task CaptureStep(string name)
+            {
+                if (Environment.GetEnvironmentVariable("PROMPTCREW_DEMO_CAPTURE_DIR") is not { Length: > 0 } directory) return;
+                await Task.Delay(230); window.UpdateLayout();
+                window.Capture(Path.Combine(directory, name + ".png"));
+            }
+            await CaptureStep("quick-01-open");
+            vm.NewTaskName = "快速创建任务"; vm.DraftInput = "程序员实现战斗原型"; vm.Persist();
+            await CaptureStep("quick-02-input");
+            var save = Visuals(window).OfType<Button>().Single(b => ReferenceEquals(b.Command, vm.SaveQuickCommand));
+            Assert.True(save.Command!.CanExecute(null)); save.Command.Execute(null); save.Command.Execute(null);
+            while (vm.IsBusy) await Task.Delay(10);
+            Assert.False(vm.HasError, vm.Status); Assert.False(vm.IsQuickCaptureOpen); Assert.True(vm.HasSavedNotice);
+            var row = vm.SelectedRound!; savedId = row.Id;
+            Assert.Equal(RoundState.PendingOutput, row.Status); Assert.Equal(team[1].Id, row.EmployeeId);
+            Assert.Equal(savedId, Assert.Single(vm.ActiveTimeline!.Cards).Id); Assert.Single(await api.Chains(project.Id));
+            Assert.Single((await api.Search(project.Id, new())).Items);
+            await CaptureStep("quick-03-saved");
+            await vm.OpenQuickCaptureAsync(team[1].Id); Assert.Equal(row.Id, vm.Settings.Drafts.Values.Single(d => d.EmployeeId == team[1].Id && d.ParentId != null).ParentId);
+            vm.DraftInput = "继续实现技能冷却"; handler.FailNext = true;
+            await Execute(vm.SaveQuickCommand, vm, expectError: true);
+            var pending = vm.Settings.Drafts.Values.Single(d => d.PendingRound != null).PendingRound!;
+            await Execute(vm.ResolvePendingCommand, vm); Assert.True(vm.HasPending);
+            Assert.Equal(pending.ClientRequestId, vm.Settings.Drafts.Values.Single(d => d.PendingRound != null).PendingRound!.ClientRequestId);
+            Assert.Equal("继续实现技能冷却", vm.DraftInput); vm.Persist();
+            window.Close();
+        }
+        using (var restored = new WorkspaceViewModel(DesktopSettings.Load(file), new CrewClient(app.Admin())))
+        {
+            await restored.InitializeAsync(); Assert.True(restored.HasPending);
+            await Execute(restored.SaveQuickCommand, restored);
+            Assert.False(restored.HasError, restored.Status); Assert.False(restored.HasPending);
+            Assert.Equal(savedId, restored.SelectedRound!.ParentRoundId); Assert.Equal(2, restored.ActiveTimeline!.Cards.Count);
+            // A historical node, rather than a neighboring employee card, owns the branch.
+            await restored.OpenActivityAsync(savedId); restored.ContinueInQuickCommand.Execute(null);
+            Assert.True(restored.IsQuickCaptureOpen); Assert.Contains("#01", restored.ParentLabel);
+            restored.DraftInput = "从旧节点探索另一方案";
+            await Execute(restored.SaveQuickCommand, restored); Assert.Equal(savedId, restored.SelectedRound!.ParentRoundId);
+            await restored.OpenQuickCaptureAsync(team[0].Id); restored.DraftInput = "设计师独立草稿"; restored.Persist();
+            await restored.OpenQuickCaptureAsync(team[1].Id); Assert.NotEqual("设计师独立草稿", restored.DraftInput);
+            await restored.OpenQuickCaptureAsync(team[0].Id); Assert.Equal("设计师独立草稿", restored.DraftInput);
+            restored.StartNewTaskCommand.Execute(null); while (restored.IsBusy) await Task.Delay(10);
+            restored.NewTaskName = "另一个任务"; restored.DraftInput = "新任务草稿"; restored.Persist();
+        }
+        using var recovery = new WorkspaceViewModel(DesktopSettings.Load(file), new CrewClient(app.Admin()));
+        await recovery.InitializeAsync(); Assert.True(recovery.IsNewTask); Assert.Equal("新任务草稿", recovery.DraftInput); Assert.Equal("另一个任务", recovery.NewTaskName);
+    }
+    private static async Task VerifyCancelledNavigation()
+    {
+        using var app = new CrewFixture(); using var api = new CrewClient(app.Admin());
+        var first = await api.SaveProject(null, new() { Name = "原项目" });
+        var second = await api.SaveProject(null, new() { Name = "目标项目" });
+        var t = RoleTemplates.All[0];
+        foreach (var p in new[] { first, second }) await api.SaveEmployee(p.Id, null, new() { Name = p.Name + "员工", Role = t.Role, Responsibilities = t.Responsibilities, BasePrompt = t.BasePrompt });
+        var gate = new GateReadHandler { InnerHandler = app.Server.CreateHandler() };
+        var http = new HttpClient(gate) { BaseAddress = new("http://localhost/") }; http.DefaultRequestHeaders.Add("X-Api-Key", CrewFixture.TestKey);
+        using var vm = new WorkspaceViewModel(new DesktopSettings { FilePath = Path.Combine(app.DirectoryPath, "switch.json"), ProjectId = second.Id }, new CrewClient(http));
+        await vm.InitializeAsync(); gate.Block = true;
+        vm.SelectedProject = vm.Projects.First(p => p.Id == first.Id); await gate.Entered.Task;
+        Assert.True(vm.CanSelectWorkspace);
+        vm.SelectedProject = vm.Projects.First(p => p.Id == second.Id); gate.Release.SetResult();
+        for (var i = 0; i < 200 && (vm.IsBusy || vm.Employees.Any(e => e.ProjectId != second.Id)); i++) await Task.Delay(10);
+        Assert.False(vm.HasError, vm.Status); Assert.Equal(second.Id, vm.SelectedProject!.Id);
+        Assert.All(vm.Employees, e => Assert.Equal(second.Id, e.ProjectId)); Assert.Equal("目标项目员工", vm.ActiveEmployee!.Name);
+    }
+    private sealed class FailBeforeWriteHandler : DelegatingHandler
+    {
+        public bool FailNext { get; set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (FailNext && request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath.EndsWith("/rounds"))
+            { FailNext = false; throw new HttpRequestException("Disconnected before request reached the server"); }
+            return base.SendAsync(request, ct);
+        }
+    }
+    private sealed class GateReadHandler : DelegatingHandler
+    {
+        public bool Block { get; set; }
+        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            if (Block && request.RequestUri!.AbsolutePath.EndsWith("/employees"))
+            { Block = false; Entered.TrySetResult(); await Release.Task; }
+            return await base.SendAsync(request, ct);
+        }
     }
     private static IEnumerable<DependencyObject> Visuals(DependencyObject root)
     {
