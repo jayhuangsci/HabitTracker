@@ -30,6 +30,7 @@ public sealed class Employee : Entity
 }
 public sealed class TaskChain : Entity
 {
+    public string? CreateFingerprint { get; set; }
     public Guid ProjectId { get; set; }
     public string Name { get; set; } = "";
     public string Goal { get; set; } = "";

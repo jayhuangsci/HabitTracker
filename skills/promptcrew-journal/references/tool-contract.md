@@ -68,3 +68,12 @@
 `compare_rounds` 可增加 `leftVersion` / `rightVersion` 指定历史输出版本，省略使用最新输出；两个轮次 ID 相同即可比较同一轮的历史结果。v1 表示尚未输出。
 
 修改目录使用 `create_project/update_project`、`create_employee/update_employee`、`create_chain/update_chain`。对象数据放 `body`，更新需 `expectedVersion`；创建项目要求管理员密钥，项目密钥可以在授权项目中创建员工、任务链和记录。
+
+
+## 连接、任务重试与员工历史分页
+
+远端仅接受 HTTPS；HTTP 限本机回环。`PROMPTCREW_TIMEOUT_SECONDS` 为 1–120 秒（默认 20）；Ctrl+C 取消调用。`network_timeout` / `request_cancelled` 表示保存结果仍可能不确定，原文件与请求 UUID 保留。
+
+`create_chain` 的 `body.createId` 可选。需要安全重试时，调用前生成并持久化 UUID；它同时是新任务 ID。同一创建内容重试返回该任务，即使任务之后改名；不同创建内容返回 409。`list_chains` 可加 `employeeId` 查询完整参与任务，不受历史页大小影响。
+
+`list_activity` 需要 `projectId`、`employeeId`，`query.take` 默认为 50、最多 200。返回 `items/total/skip/take/hasMore/nextCursor`，最新记录在前。继续获取更早记录时将 `nextCursor` 放入顶层 `beforeId` 并设 `query.skip: 0`，直到 `hasMore: false`；其他客户端新增记录不会移动该游标。重新查询首屏可获取新记录。

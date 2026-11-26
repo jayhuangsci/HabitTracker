@@ -5,7 +5,7 @@ description: 在已连接的 PromptCrew 中，以项目、AI 员工和任务分�
 
 # PromptCrew 任务归档
 
-使用真实可执行的 HTTP 工具。运行环境需配置 `PROMPTCREW_API_URL`、`PROMPTCREW_KEY_FILE` 和 `PROMPTCREW_TOOLS_DLL`。密钥由宿主读取，不填入提示词或工具参数。
+使用真实可执行的 HTTP 工具。运行环境需配置 `PROMPTCREW_API_URL`、`PROMPTCREW_KEY_FILE` 和 `PROMPTCREW_TOOLS_DLL`。密钥由宿主读取，不填入提示词或工具参数。远端地址使用 HTTPS；HTTP 仅允许本机回环地址。可通过 `PROMPTCREW_TIMEOUT_SECONDS` 设置 1–120 秒超时（默认 20）。
 
 调用方法及载荷见 [工具约定](references/tool-contract.md)。PowerShell 宿主可运行 `scripts/invoke.ps1 -RequestFile <绝对路径>`；其他环境使用 `dotnet "$PROMPTCREW_TOOLS_DLL" invoke <绝对路径>`。工具输出 JSON，`ok: true` 才表示操作成功。
 
@@ -22,7 +22,9 @@ description: 在已连接的 PromptCrew 中，以项目、AI 员工和任务分�
 
 - 网络错误：保留完整请求文件和原 UUID，用同一文件重试；也可通过 `get_by_request` 查询输入是否已保存。查询不到不能说明另一个尚未结束的请求不会提交；需要再次提交时继续使用原文件。
 - `409 request_id_conflict`：原 ID 已对应其他内容，核对原文件；新业务操作才生成新 ID。
-- `409 version_conflict`：读取最新记录并核对差异。输出修正另建请求、使用新版本号；员工定义冲突则重新获取上下文、调整实际输入后再建新请求。已经成功的请求仍应按原文件重试。
+- 超时或取消后，只有确认已保存或保留原 ID 重试，才能消除不确定性。先前结果不确定时，即使后来得到 404/409，也不能据此丢弃原请求并用新 ID 重复提交。
+- 创建新任务时，先在请求文件中保存一次 UUID `body.createId`；重试使用同一文件，已创建任务后续改名不会改变创建请求的身份。
+- `409 version_conflict`：读取最新记录并核对差异。首次请求已被明确拒绝且此前没有不确定结果时，输出修正另建请求、使用新版本号；员工定义冲突则重新获取上下文、调整实际输入后再建新请求。已经成功的请求仍应按原文件重试。
 - `401/403`：停止依赖该权限的归档操作，报告所需连接或项目授权。
 - 保存失败时明确说明未确认保存，返回请求 ID 和本地请求文件位置。任务是否继续由现有用户指令决定，不把未保存的工作描述为已归档。
 

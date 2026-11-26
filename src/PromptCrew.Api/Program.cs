@@ -57,7 +57,7 @@ api.MapPost("/projects/{projectId:guid}/employees", async (Guid projectId, Emplo
     Results.Created($"/api/projects/{projectId}/employees", await s.SaveEmployee(projectId, null, input, h.Actor(), ct)));
 api.MapGet("/projects/{projectId:guid}/employees/{id:guid}", (Guid projectId, Guid id, HttpContext h, CrewService s, CancellationToken ct) => s.GetEmployee(projectId, id, h.Actor(), ct));
 api.MapPut("/projects/{projectId:guid}/employees/{id:guid}", (Guid projectId, Guid id, EmployeeInput input, HttpContext h, CrewService s, CancellationToken ct) => s.SaveEmployee(projectId, id, input, h.Actor(), ct));
-api.MapGet("/projects/{projectId:guid}/chains", (Guid projectId, HttpContext h, CrewService s, CancellationToken ct) => s.ListChains(projectId, h.Actor(), ct));
+api.MapGet("/projects/{projectId:guid}/chains", (Guid projectId, Guid? employeeId, HttpContext h, CrewService s, CancellationToken ct) => s.ListChains(projectId, h.Actor(), ct, employeeId));
 api.MapPost("/projects/{projectId:guid}/chains", async (Guid projectId, ChainInput input, HttpContext h, CrewService s, CancellationToken ct) =>
     Results.Created($"/api/projects/{projectId}/chains", await s.SaveChain(projectId, null, input, h.Actor(), ct)));
 api.MapGet("/projects/{projectId:guid}/chains/{id:guid}", (Guid projectId, Guid id, HttpContext h, CrewService s, CancellationToken ct) => s.GetChain(projectId, id, h.Actor(), ct));
@@ -83,7 +83,7 @@ api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/graph", (Guid proje
 api.MapGet("/projects/{projectId:guid}/chains/{chainId:guid}/context", (Guid projectId, Guid chainId, Guid? roundId, Guid employeeId, [Microsoft.AspNetCore.Mvc.FromQuery] Guid[]? referenceId, HttpContext h, CrewService s, CancellationToken ct) => s.Context(projectId, chainId, roundId, employeeId, h.Actor(), ct, referenceId));
 api.MapGet("/projects/{projectId:guid}/compare", (Guid projectId, Guid left, Guid right, int? leftVersion, int? rightVersion, HttpContext h, CrewService s, CancellationToken ct) => s.Compare(projectId, left, right, h.Actor(), ct, leftVersion, rightVersion));
 api.MapGet("/projects/{projectId:guid}/activity", (Guid projectId, HttpContext h, CrewService s, CancellationToken ct) => s.Activity(projectId, h.Actor(), ct));
-api.MapGet("/projects/{projectId:guid}/activity-page", (Guid projectId, Guid employeeId, int? skip, int? take, HttpContext h, CrewService s, CancellationToken ct) => s.ActivityPage(projectId, employeeId, skip ?? 0, take ?? 50, h.Actor(), ct));
+api.MapGet("/projects/{projectId:guid}/activity-page", (Guid projectId, Guid employeeId, int? skip, int? take, Guid? beforeId, HttpContext h, CrewService s, CancellationToken ct) => s.ActivityPage(projectId, employeeId, skip ?? 0, take ?? 50, h.Actor(), ct, beforeId));
 app.Run();
 
 public partial class Program;

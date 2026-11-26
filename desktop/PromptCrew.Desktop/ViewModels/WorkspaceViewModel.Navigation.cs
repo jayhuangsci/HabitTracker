@@ -9,6 +9,7 @@ public sealed partial class WorkspaceViewModel
     private bool _overview = true;
     private EmployeeDto? _activeEmployee;
     private ActivityDto[] _activities = [];
+    private readonly Dictionary<Guid, ChainDto[]> _employeeTasks = [];
     private string _contextHeading = "当前分支上下文";
     public string ContextHeading { get => _contextHeading; private set => SetProperty(ref _contextHeading, value); }
     private readonly Dictionary<Guid, Guid> _employeeChains = [];
@@ -31,7 +32,7 @@ public sealed partial class WorkspaceViewModel
     public bool HasTeam => EmployeeTimelines.Count > 0;
     public bool HasNoTeam => !HasTeam;
     public bool HasNoProject => !HasProject;
-    public ChainDto[] ParticipatingChains => Chains.Where(c => _activities.Any(r => r.EmployeeId == _activeEmployee?.Id && r.ChainId == c.Id)).ToArray();
+    public ChainDto[] ParticipatingChains => _activeEmployee == null ? [] : _employeeTasks.GetValueOrDefault(_activeEmployee.Id) ?? [];
     public bool HasParticipatingChains => ParticipatingChains.Length > 0;
     public string RecordRelations => _round == null ? "" : $"所属任务：{Chains.FirstOrDefault(x => x.Id == _round.ChainId)?.Name}\n父节点：{(_round.ParentRoundId?.ToString() ?? "首轮")}\n输入修订自：{(_round.RevisesRoundId?.ToString() ?? "无")}\n引用轮次：{( _round.ReferenceRoundIds.Length == 0 ? "无" : string.Join(", ", _round.ReferenceRoundIds))}";
     public RelayCommand OverviewCommand { get; private set; } = null!;
@@ -84,22 +85,25 @@ public sealed partial class WorkspaceViewModel
             {
                 var page = await _api.ActivityPage(project.Id, employee.Id, ct: token);
                 token.ThrowIfCancellationRequested();
-                return new EmployeeTimeline(employee, page.Items, page.Total);
+                var tasks = await _api.Chains(project.Id, token, employee.Id);
+                token.ThrowIfCancellationRequested();
+                return (Lane: new EmployeeTimeline(employee, page.Items, page.Total, page.NextCursor), Tasks: tasks);
             }
             finally { limit.Release(); }
         }));
         token.ThrowIfCancellationRequested();
-        Replace(EmployeeTimelines, lanes);
-        _activities = lanes.SelectMany(x => x.Cards).Select(x => x.Record).OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id).ToArray();
+        Replace(EmployeeTimelines, lanes.Select(x => x.Lane));
+        _employeeTasks.Clear(); foreach (var item in lanes) _employeeTasks[item.Lane.Id] = item.Tasks;
+        _activities = lanes.SelectMany(x => x.Lane.Cards).Select(x => x.Record).OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id).ToArray();
         NotifyNavigation();
     }
     private Task LoadOlder(Guid employeeId) => RunAsync(async () =>
     {
         var lane = EmployeeTimelines.FirstOrDefault(x => x.Id == employeeId);
         if (_project == null || lane == null || !lane.HasMore) return;
-        var page = await Read(ct => _api.ActivityPage(_project.Id, employeeId, lane.Cards.Count, 50, ct));
+        var page = await Read(ct => _api.ActivityPage(_project.Id, employeeId, ct: ct, beforeId: lane.NextCursor));
         var records = lane.Cards.Select(x => x.Record).Concat(page.Items).DistinctBy(x => x.Id).ToArray();
-        EmployeeTimelines[EmployeeTimelines.IndexOf(lane)] = new(lane.Employee, records, page.Total);
+        EmployeeTimelines[EmployeeTimelines.IndexOf(lane)] = new(lane.Employee, records, page.Total, page.NextCursor);
         _activities = EmployeeTimelines.SelectMany(x => x.Cards).Select(x => x.Record).OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id).ToArray();
         NotifyNavigation(); Status = "已加载更早的工作记录。";
     });

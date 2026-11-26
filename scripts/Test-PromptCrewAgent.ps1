@@ -77,7 +77,13 @@ try {
     if ($context.ancestors.Count -ne 2 -or $context.references.Count -ne 1 -or $context.compiledContext.Contains($steps[1].input)) { throw 'Branch context leaked an unreferenced sibling.' }
     $graph = (Invoke-CrewTool @{ operation='get_graph'; projectId=$project.id; chainId=$chain.id }).data
     if ($graph.nodes.Count -ne 6) { throw 'Unexpected node count.' }
-    $summary = @{ ok=$true; projectId=$project.id; chainId=$chain.id; employees=$team.Count; rounds=$graph.nodes.Count; handoffs=$true; branchContext=$true; idempotency=$true; conflict=$true; historicalComparison=$true; requestFiles=$script:sequence; dataDirectory=$dataDir }
+    $activity = (Invoke-CrewTool @{ operation='list_activity'; projectId=$project.id; employeeId=$team[1].id; query=@{skip=0;take=1} }).data
+    if ($activity.total -ne 2 -or $activity.items.Count -ne 1 -or $activity.items[0].employeeId -ne $team[1].id) { throw 'Employee activity paging failed.' }
+    $taskRequest = @{ operation='create_chain'; projectId=$project.id; body=@{ createId=[Guid]::NewGuid().ToString();name='安全重试任务';goal='确认创建不重复' } }
+    $createdTask = (Invoke-CrewTool $taskRequest).data
+    $replayedTask = (Invoke-CrewTool $taskRequest).data
+    if ($createdTask.id -ne $replayedTask.id) { throw 'Task creation replay changed ID.' }
+    $summary = @{ ok=$true; projectId=$project.id; chainId=$chain.id; employees=$team.Count; rounds=$graph.nodes.Count; handoffs=$true; branchContext=$true; idempotency=$true; conflict=$true; historicalComparison=$true; activityPaging=$true; taskCreationReplay=$true; requestFiles=$script:sequence; dataDirectory=$dataDir }
     $summary | ConvertTo-Json | Set-Content (Join-Path $dataDir 'summary.json') -Encoding utf8NoBOM
     $summary | ConvertTo-Json
 }

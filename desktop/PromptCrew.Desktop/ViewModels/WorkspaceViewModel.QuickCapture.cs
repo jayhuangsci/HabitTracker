@@ -13,13 +13,12 @@ public sealed partial class WorkspaceViewModel
     public string QuickTaskLabel => _chain == null ? "新任务 · 保存时创建" : $"任务：{_chain.Name}";
     public bool IsNewTask => _chain == null;
     public string NewTaskName { get => _draft.NewTaskName; set { _draft.NewTaskName = value; ChangedDraft(); } }
-    public bool CanSaveQuick => !IsBusy && _project != null && _employee is { IsActive: true } && _draft.PendingResult == null
+    public bool CanSaveQuick => !IsBusy && (_project?.Status == ProjectState.Active || _draft.PendingRound != null || _draft.NewTaskId != null) && _employee is { IsActive: true } && _draft.PendingResult == null
         && (!string.IsNullOrWhiteSpace(DraftInput) || _draft.PendingRound != null)
         && (_chain != null || !string.IsNullOrWhiteSpace(NewTaskName));
     public bool CanEditQuick => !IsBusy && !HasPending;
     public string SavedNotice { get => _savedNotice; private set { SetProperty(ref _savedNotice, value); OnPropertyChanged(nameof(HasSavedNotice)); } }
     public bool HasSavedNotice => SavedNotice.Length > 0;
-    private bool _pendingAbsent;
     public RelayCommand ReleasePendingCommand { get; private set; } = null!;
     public RelayCommand ContinueInQuickCommand { get; private set; } = null!;
     public bool ReduceMotion { get => _settings.ReduceMotion; set { _settings.ReduceMotion = value; OnPropertyChanged(); Persist(); } }
@@ -48,13 +47,16 @@ public sealed partial class WorkspaceViewModel
             ReleasePendingCommand = new(_ => _ = RunAsync(async () =>
             {
                 _draft.PendingRound = null; _draft.PendingResult = null; _draft.PendingResultRoundId = null;
-                _pendingAbsent = false; PersistRequired();
+                if (_draft.NewTaskRejected) _draft.NewTaskId = null;
+                _draft.NewTaskRejected = false;
+                _draft.RoundRejected = _draft.ResultRejected = false; PersistRequired();
                 if (_project != null) Replace(Employees, await Read(ct => _api.Employees(_project.Id, ct)));
                 _employee = Employees.FirstOrDefault(e => e.Id == _activeEmployee?.Id);
+                SetActiveEmployee(_employee);
                 if (_round != null) await SelectRoundCore(_round.Id);
                 Status = "已恢复为可编辑草稿。下一次保存会创建新请求；原始输入仍保留。";
                 NotifyDraft();
-            }), () => !IsBusy && HasPending && _pendingAbsent);
+            }), () => !IsBusy && HasPending && (_draft.RoundRejected || _draft.ResultRejected || _draft.NewTaskRejected));
             SaveQuickCommand = new(() => RunAsync(SaveQuick), () => CanSaveQuick);
         }
         foreach (var name in new[] { nameof(QuickCaptureTitle), nameof(QuickTaskLabel), nameof(IsNewTask), nameof(NewTaskName), nameof(CanSaveQuick), nameof(CanEditQuick) }) OnPropertyChanged(name);
@@ -75,10 +77,15 @@ public sealed partial class WorkspaceViewModel
         if (_project == null || _employee == null) return;
         if (_chain == null)
         {
-            _draft.NewTaskId ??= Guid.NewGuid();
+            if (_draft.NewTaskId == null) { _draft.NewTaskId = Guid.NewGuid(); _draft.NewTaskAttempted = false; }
+            var mayReject = !_draft.NewTaskAttempted || _draft.NewTaskRejected;
+            _draft.NewTaskAttempted = true; _draft.NewTaskRejected = false;
             PersistRequired(); NotifyState();
-            var created = await _api.SaveChain(_project.Id, null, new ChainInput
-            { CreateId = _draft.NewTaskId, Name = NewTaskName, Goal = NewTaskName }, OperationToken);
+            ChainDto created;
+            try { created = await _api.SaveChain(_project.Id, null, new ChainInput
+            { CreateId = _draft.NewTaskId, Name = NewTaskName, Goal = NewTaskName }, OperationToken); }
+            catch (PromptCrew.Client.CrewApiException e) when (mayReject && e.Status is 400 or 403 or 404 or 409)
+            { _draft.NewTaskRejected = true; PersistRequired(); throw; }
             OperationToken.ThrowIfCancellationRequested();
             // Move the same draft only after the server has confirmed the task ID.
             var looseKey = _settings.ApiUrl.TrimEnd('/').ToLowerInvariant() + "|new|" + _employee.Id;

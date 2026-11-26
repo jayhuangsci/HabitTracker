@@ -53,15 +53,20 @@ public sealed partial class WorkspaceViewModel
         if (_project == null || _chain == null || _employee == null) return;
         if (_draft.PendingRound == null)
         {
-            _pendingAbsent = false;
+            _draft.RoundAttempted = _draft.RoundRejected = false;
             var references = Split(DraftReferences).Select(s => Guid.TryParse(s, out var id) ? id : throw new ArgumentException("成果引用须填写轮次 GUID，以逗号或换行分隔。")).ToArray();
             _draft.PendingRound = new RoundInput { ClientRequestId = Guid.NewGuid(), EmployeeId = _employee.Id,
                 ParentRoundId = _draft.ParentId, RevisesRoundId = _draft.RevisesId, Input = Rules.Text(DraftInput, "原始提示词", 100000, true),
                 Model = DraftModel, Tags = Split(DraftTags), ReferenceRoundIds = references, Notes = DraftNotes, Source = EntrySource.Manual,
                 ExpectedEmployeeVersion = _employee.Version };
         }
+        var mayReject = !_draft.RoundAttempted || _draft.RoundRejected;
+        _draft.RoundAttempted = true; _draft.RoundRejected = false;
         PersistRequired(); NotifyState();
-        var saved = await _api.SaveRound(_project.Id, _chain.Id, _draft.PendingRound, OperationToken);
+        RoundSaved saved;
+        try { saved = await _api.SaveRound(_project.Id, _chain.Id, _draft.PendingRound, OperationToken); }
+        catch (CrewApiException e) when (mayReject && e.Status is 400 or 403 or 404 or 409)
+        { _draft.RoundRejected = true; PersistRequired(); throw; }
         _draft.PendingRound = null; _draft.Input = ""; _draft.Notes = ""; _draft.RevisesId = null; _draft.ParentId = saved.Round.Id;
         PersistRequired(); ApplySavedRound(saved.Round); NotifyDraft();
         await RefreshSavedGraph(saved.Round.Id);
@@ -72,12 +77,18 @@ public sealed partial class WorkspaceViewModel
         if (_project == null || _round == null) return;
         if (_draft.PendingResult == null)
         {
+            _draft.ResultAttempted = _draft.ResultRejected = false;
             _draft.PendingResultRoundId = _round.Id;
             _draft.PendingResult = new ResultInput { ClientRequestId = Guid.NewGuid(), ExpectedVersion = _round.Version,
                 Output = DraftOutput, Status = ResultStatus, Artifacts = Split(DraftArtifacts), Note = ResultNote };
         }
+        var mayReject = !_draft.ResultAttempted || _draft.ResultRejected;
+        _draft.ResultAttempted = true; _draft.ResultRejected = false;
         PersistRequired(); NotifyState();
-        var saved = await _api.SaveResult(_project.Id, _draft.PendingResultRoundId!.Value, _draft.PendingResult, OperationToken);
+        RoundSaved saved;
+        try { saved = await _api.SaveResult(_project.Id, _draft.PendingResultRoundId!.Value, _draft.PendingResult, OperationToken); }
+        catch (CrewApiException e) when (mayReject && e.Status is 400 or 403 or 404 or 409)
+        { _draft.ResultRejected = true; PersistRequired(); throw; }
         _draft.PendingResult = null; _draft.PendingResultRoundId = null; _draft.ResultNote = "";
         PersistRequired(); ApplySavedRound(saved.Round); NotifyDraft();
         await RefreshSavedGraph(saved.Round.Id);
@@ -92,7 +103,6 @@ public sealed partial class WorkspaceViewModel
             RoundDto? saved = null;
             try { saved = await Read(ct => _api.ByRequest(_project.Id, _draft.PendingRound.ClientRequestId, ct)); }
             catch (CrewApiException e) when (e.Status == 404) { }
-            _pendingAbsent = saved == null;
             if (saved != null)
             {
                 _draft.PendingRound = null;
@@ -105,7 +115,6 @@ public sealed partial class WorkspaceViewModel
         {
             var row = await Read(ct => _api.Round(_project.Id, _draft.PendingResultRoundId.Value, ct));
             var exists = row.Results.Any(x => x.ClientRequestId == _draft.PendingResult.ClientRequestId);
-            _pendingAbsent = !exists;
             if (exists) { _draft.PendingResult = null; _draft.PendingResultRoundId = null; }
             await SelectRoundCore(row.Id);
             Status = exists ? "已找到原结果版本，保存已确认。" : "服务中未找到该结果请求。原请求 ID 保留，可重试同一结果。";
@@ -123,7 +132,7 @@ public sealed partial class WorkspaceViewModel
         {
             var exists = lane.Cards.Any(x => x.Id == row.Id);
             var records = lane.Cards.Where(x => x.Id != row.Id).Select(x => x.Record).Append(activity);
-            EmployeeTimelines[EmployeeTimelines.IndexOf(lane)] = new(lane.Employee, records, lane.Total + (exists ? 0 : 1));
+            EmployeeTimelines[EmployeeTimelines.IndexOf(lane)] = new(lane.Employee, records, lane.Total + (exists ? 0 : 1), lane.NextCursor);
         }
         OnPropertyChanged(nameof(SelectedRound)); NotifyNavigation();
     }

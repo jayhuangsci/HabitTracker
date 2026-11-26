@@ -12,6 +12,12 @@ using PromptCrew.Client;
 using PromptCrew.Core;
 using PromptCrew.Desktop;
 using PromptCrew.Desktop.ViewModels;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace PromptCrew.Desktop.Tests;
 
@@ -99,6 +105,8 @@ public sealed class WorkspaceTests
                     await VerifyEmployeeOverview();
                     await VerifyQuickCapture();
                     await VerifyCancelledNavigation();
+                    await VerifyResultRecovery();
+                    await VerifyConnectionCancellation();
                     completion.SetResult();
                 }
                 catch (Exception e) { completion.TrySetException(e); }
@@ -256,6 +264,7 @@ public sealed class WorkspaceTests
             await Execute(vm.SaveQuickCommand, vm, expectError: true);
             var pending = vm.Settings.Drafts.Values.Single(d => d.PendingRound != null).PendingRound!;
             await Execute(vm.ResolvePendingCommand, vm); Assert.True(vm.HasPending);
+            Assert.False(vm.ReleasePendingCommand.CanExecute(null)); // A 404 cannot rule out a late commit.
             Assert.Equal(pending.ClientRequestId, vm.Settings.Drafts.Values.Single(d => d.PendingRound != null).PendingRound!.ClientRequestId);
             Assert.Equal("继续实现技能冷却", vm.DraftInput); vm.Persist();
             window.Close();
@@ -276,6 +285,13 @@ public sealed class WorkspaceTests
             await restored.OpenQuickCaptureAsync(team[0].Id); Assert.Equal("设计师独立草稿", restored.DraftInput);
             restored.StartNewTaskCommand.Execute(null); while (restored.IsBusy) await Task.Delay(10);
             restored.NewTaskName = "另一个任务"; restored.DraftInput = "新任务草稿"; restored.Persist();
+            var currentProject = (await api.Projects()).Single();
+            var archived = await api.SaveProject(project.Id, new() { Name = currentProject.Name, Status = ProjectState.Archived, ExpectedVersion = currentProject.Version });
+            await Execute(restored.SaveQuickCommand, restored, true);
+            Assert.True(restored.HasPending); Assert.True(restored.ReleasePendingCommand.CanExecute(null));
+            restored.ReleasePendingCommand.Execute(null); while (restored.IsBusy) await Task.Delay(10);
+            Assert.False(restored.HasPending); Assert.Equal("新任务草稿", restored.DraftInput);
+            await api.SaveProject(project.Id, new() { Name = archived.Name, Status = ProjectState.Active, ExpectedVersion = archived.Version });
         }
         using var recovery = new WorkspaceViewModel(DesktopSettings.Load(file), new CrewClient(app.Admin()));
         await recovery.InitializeAsync(); Assert.True(recovery.IsNewTask); Assert.Equal("新任务草稿", recovery.DraftInput); Assert.Equal("另一个任务", recovery.NewTaskName);
@@ -285,8 +301,9 @@ public sealed class WorkspaceTests
         using var app = new CrewFixture(); using var api = new CrewClient(app.Admin());
         var first = await api.SaveProject(null, new() { Name = "原项目" });
         var second = await api.SaveProject(null, new() { Name = "目标项目" });
+        var third = await api.SaveProject(null, new() { Name = "第三项目" });
         var t = RoleTemplates.All[0];
-        foreach (var p in new[] { first, second }) await api.SaveEmployee(p.Id, null, new() { Name = p.Name + "员工", Role = t.Role, Responsibilities = t.Responsibilities, BasePrompt = t.BasePrompt });
+        foreach (var p in new[] { first, second, third }) await api.SaveEmployee(p.Id, null, new() { Name = p.Name + "员工", Role = t.Role, Responsibilities = t.Responsibilities, BasePrompt = t.BasePrompt });
         var gate = new GateReadHandler { InnerHandler = app.Server.CreateHandler() };
         var http = new HttpClient(gate) { BaseAddress = new("http://localhost/") }; http.DefaultRequestHeaders.Add("X-Api-Key", CrewFixture.TestKey);
         using var vm = new WorkspaceViewModel(new DesktopSettings { FilePath = Path.Combine(app.DirectoryPath, "switch.json"), ProjectId = second.Id }, new CrewClient(http));
@@ -297,6 +314,76 @@ public sealed class WorkspaceTests
         for (var i = 0; i < 200 && (vm.IsBusy || vm.Employees.Any(e => e.ProjectId != second.Id)); i++) await Task.Delay(10);
         Assert.False(vm.HasError, vm.Status); Assert.Equal(second.Id, vm.SelectedProject!.Id);
         Assert.All(vm.Employees, e => Assert.Equal(second.Id, e.ProjectId)); Assert.Equal("目标项目员工", vm.ActiveEmployee!.Name);
+        gate.Arm();
+        vm.SelectedProject = vm.Projects.First(p => p.Id == first.Id); await gate.Entered.Task;
+        vm.SelectedProject = vm.Projects.First(p => p.Id == third.Id); gate.Release.SetResult();
+        for (var i = 0; i < 200 && (vm.IsBusy || vm.ActiveEmployee?.ProjectId != third.Id); i++) await Task.Delay(10);
+        Assert.Equal(third.Id, vm.SelectedProject!.Id); Assert.All(vm.Employees, e => Assert.Equal(third.Id, e.ProjectId));
+        vm.DraftInput = "取消切换前的草稿"; vm.Persist();
+        gate.Arm();
+        vm.SelectedProject = vm.Projects.First(p => p.Id == first.Id); await gate.Entered.Task;
+        vm.CancelCommand.Execute(null); gate.Release.SetResult();
+        while (vm.IsBusy) await Task.Delay(10);
+        Assert.Equal(third.Id, vm.SelectedProject!.Id); Assert.Equal("取消切换前的草稿", vm.DraftInput);
+        Assert.All(vm.Employees, e => Assert.Equal(third.Id, e.ProjectId));
+    }
+    private static async Task VerifyResultRecovery()
+    {
+        using var app = new CrewFixture(); using var api = new CrewClient(app.Admin());
+        var project = await api.SaveProject(null, new() { Name = "输出恢复" }); var template = RoleTemplates.All[0];
+        var employee = await api.SaveEmployee(project.Id, null, new() { Name = template.Name, Role = template.Role, Responsibilities = template.Responsibilities, BasePrompt = template.BasePrompt });
+        var chain = await api.SaveChain(project.Id, null, new() { Name = "输出任务", Goal = "不重复" });
+        var round = (await api.SaveRound(project.Id, chain.Id, new() { ClientRequestId = Guid.NewGuid(), EmployeeId = employee.Id, Input = "实现原型" })).Round;
+        var handler = new ResultFaultHandler { InnerHandler = app.Server.CreateHandler() };
+        var http = new HttpClient(handler) { BaseAddress = new("http://localhost/") }; http.DefaultRequestHeaders.Add("X-Api-Key", CrewFixture.TestKey);
+        using var vm = new WorkspaceViewModel(new DesktopSettings { FilePath = Path.Combine(app.DirectoryPath, "results.json") }, new CrewClient(http));
+        await vm.InitializeAsync(); vm.DraftOutput = "成果一"; handler.FailBefore = true;
+        await Execute(vm.SaveResultCommand, vm, true); await Execute(vm.ResolvePendingCommand, vm);
+        Assert.False(vm.ReleasePendingCommand.CanExecute(null));
+        await Execute(vm.SaveResultCommand, vm);
+        vm.DraftOutput = "成果二"; handler.LoseAfter = true;
+        await Execute(vm.SaveResultCommand, vm, true); Assert.False(vm.ReleasePendingCommand.CanExecute(null));
+        await Execute(vm.ResolvePendingCommand, vm); Assert.False(vm.HasPending); Assert.Equal(2, vm.SelectedRound!.Results.Length);
+        // A first attempt rejected by optimistic concurrency can safely return to editing.
+        await api.SaveResult(project.Id, round.Id, new() { ClientRequestId = Guid.NewGuid(), ExpectedVersion = vm.SelectedRound.Version, Output = "远端成果" });
+        vm.DraftOutput = "本地修正"; await Execute(vm.SaveResultCommand, vm, true);
+        Assert.True(vm.ReleasePendingCommand.CanExecute(null)); vm.ReleasePendingCommand.Execute(null); while (vm.IsBusy) await Task.Delay(10);
+        Assert.Equal("本地修正", vm.DraftOutput); await Execute(vm.SaveResultCommand, vm);
+        Assert.Equal(4, vm.SelectedRound!.Results.Length); Assert.Equal("远端成果", vm.SelectedRound.Results[2].Output);
+    }
+    private static async Task VerifyConnectionCancellation()
+    {
+        using var app = new CrewFixture(); using var api = new CrewClient(app.Admin());
+        var project = await api.SaveProject(null, new() { Name = "连接取消原项目" });
+        using var vm = new WorkspaceViewModel(new DesktopSettings { FilePath = Path.Combine(app.DirectoryPath, "connection.json") }, new CrewClient(app.Admin()));
+        await vm.InitializeAsync(); var originalUrl = vm.Settings.ApiUrl;
+        var builder = WebApplication.CreateBuilder(); builder.WebHost.UseUrls("http://127.0.0.1:0");
+        await using var remote = builder.Build(); var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        remote.MapGet("/api/session", () => new SessionDto(false, "测试连接", []));
+        remote.MapGet("/api/employee-templates", () => RoleTemplates.All);
+        remote.MapGet("/api/projects", async (HttpContext context) => { entered.TrySetResult(); await Task.Delay(10000, context.RequestAborted); return Array.Empty<ProjectDto>(); });
+        await remote.StartAsync();
+        var address = remote.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.Single();
+        var key = Path.Combine(app.DirectoryPath, "candidate.key"); File.WriteAllText(key, CrewFixture.TestKey);
+        using var cancel = new CancellationTokenSource();
+        var change = vm.ChangeConnection(address, key, ct: cancel.Token); await entered.Task; cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => change);
+        Assert.Equal(originalUrl, vm.Settings.ApiUrl); Assert.Equal(project.Id, vm.SelectedProject!.Id); Assert.True(vm.IsAdmin);
+        Assert.Equal(project.Id, (await vm.Api.Projects()).Single().Id);
+        await remote.StopAsync();
+    }
+    private sealed class ResultFaultHandler : DelegatingHandler
+    {
+        public bool FailBefore { get; set; }
+        public bool LoseAfter { get; set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var resultWrite = request.Method == HttpMethod.Post && request.RequestUri!.AbsolutePath.EndsWith("/results");
+            if (resultWrite && FailBefore) { FailBefore = false; throw new HttpRequestException("Before commit"); }
+            var response = await base.SendAsync(request, ct);
+            if (resultWrite && LoseAfter) { LoseAfter = false; response.Dispose(); throw new HttpRequestException("After commit"); }
+            return response;
+        }
     }
     private sealed class FailBeforeWriteHandler : DelegatingHandler
     {
@@ -311,8 +398,9 @@ public sealed class WorkspaceTests
     private sealed class GateReadHandler : DelegatingHandler
     {
         public bool Block { get; set; }
-        public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Entered { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource Release { get; private set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Arm() { Block = true; Entered = new(TaskCreationOptions.RunContinuationsAsynchronously); Release = new(TaskCreationOptions.RunContinuationsAsynchronously); }
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             if (Block && request.RequestUri!.AbsolutePath.EndsWith("/employees"))

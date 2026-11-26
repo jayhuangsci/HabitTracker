@@ -25,6 +25,12 @@ public sealed class EditorDraft
     public Guid? PendingResultRoundId { get; set; }
     public string NewTaskName { get; set; } = "";
     public Guid? NewTaskId { get; set; }
+    public bool RoundAttempted { get; set; } = true;
+    public bool RoundRejected { get; set; }
+    public bool ResultAttempted { get; set; } = true;
+    public bool ResultRejected { get; set; }
+    public bool NewTaskAttempted { get; set; } = true;
+    public bool NewTaskRejected { get; set; }
 }
 public sealed class DesktopSettings
 {

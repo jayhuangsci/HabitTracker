@@ -7,14 +7,15 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "operation": { "type": "string", "enum": ["session", "list_projects", "get_project", "create_project", "update_project", "list_employees", "get_employee", "create_employee", "update_employee", "list_templates", "list_chains", "get_chain", "create_chain", "update_chain", "save_round", "save_result", "get_round", "get_by_request", "get_context", "search_rounds", "get_graph", "compare_rounds"] },
+          "operation": { "type": "string", "enum": ["session", "list_projects", "get_project", "create_project", "update_project", "list_employees", "get_employee", "create_employee", "update_employee", "list_templates", "list_chains", "get_chain", "create_chain", "update_chain", "save_round", "save_result", "get_round", "get_by_request", "get_context", "search_rounds", "get_graph", "list_activity", "compare_rounds"] },
           "projectId": { "type": "string", "format": "uuid" },
           "chainId": { "type": "string", "format": "uuid" },
-          "employeeId": { "type": "string", "format": "uuid" },
+          "employeeId": { "type": "string", "format": "uuid", "description": "Required for employee operations, get_context, and list_activity." },
           "roundId": { "type": "string", "format": "uuid", "description": "For get_context: the chosen parent; omit for a new root." },
           "otherRoundId": { "type": "string", "format": "uuid" },
           "leftVersion": { "type": "integer", "minimum": 1, "description": "Optional output version of roundId for compare_rounds; omitted selects latest." },
           "rightVersion": { "type": "integer", "minimum": 1, "description": "Optional output version of otherRoundId. Use the same round IDs to compare its output history." },
+          "beforeId": { "type": "string", "format": "uuid", "description": "list_activity continuation: use the prior nextCursor, skip 0. Stable when other clients append." },
           "clientRequestId": { "type": "string", "format": "uuid", "description": "Only for get_by_request. For writes put clientRequestId inside body." },
           "referenceIds": { "type": "array", "items": { "type": "string", "format": "uuid" }, "maxItems": 24 },
           "query": {
@@ -26,7 +27,7 @@
               "skip": { "type": "integer", "minimum": 0 }, "take": { "type": "integer", "minimum": 1, "maximum": 200 }
             }, "additionalProperties": false
           },
-          "body": { "type": "object", "description": "The exact API input. save_round and save_result require a fresh UUID clientRequestId, retained with this entire request for retries. Updates and save_result require expectedVersion." }
+          "body": { "type": "object", "description": "The exact API input. save_round and save_result require a fresh UUID clientRequestId, retained with this entire request for retries. Updates and save_result require expectedVersion. create_chain accepts a stable body.createId for retry-safe creation. list_activity uses employeeId and query.skip/query.take (max 200)." }
         },
         "required": ["operation"], "additionalProperties": false
       }

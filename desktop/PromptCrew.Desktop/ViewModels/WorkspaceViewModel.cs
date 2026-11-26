@@ -58,6 +58,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
         _saveTimer.Tick += (_, _) => { _saveTimer.Stop(); Persist(); };
         _searchState = SearchStates[0];
         NotifyState();
+        CaptureWorkspace();
     }
     private CrewClient Connect() => new(_settings.ApiUrl, () => CrewClient.ReadKeyFile(_settings.KeyFile), TimeSpan.FromSeconds(_settings.TimeoutSeconds));
     public CrewClient Api => _api;
@@ -77,6 +78,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     public string Status { get => _status; private set => SetProperty(ref _status, value); }
     public bool HasProject => _project != null;
     public bool HasChain => _chain != null;
+    public bool HasChains => Chains.Count > 0;
     public bool HasRound => _round != null;
     public bool IsIdle => !IsBusy;
     public bool HasPending => _draft.PendingRound != null || _draft.PendingResult != null || _draft.NewTaskId != null;
@@ -113,12 +115,12 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     public ProjectDto? SelectedProject
     {
         get => _project;
-        set { if (!_loading && !CanSelectWorkspace) return; if (!SetProperty(ref _project, value)) return; NotifyState(); if (!_loading) _ = NavigateAsync(LoadProject); }
+        set { if (!_loading && !CanSelectWorkspace) return; if (!SetProperty(ref _project, value)) return; NotifyState(); if (!_loading) _ = NavigateAsync(async () => { _project = value; OnPropertyChanged(nameof(SelectedProject)); await LoadProject(); }); }
     }
     public ChainDto? SelectedChain
     {
         get => _chain;
-        set { if (!_loading && !CanSelectWorkspace) return; if (!SetProperty(ref _chain, value)) return; NotifyState(); if (!_loading) _ = NavigateAsync(LoadChain); }
+        set { if (!_loading && !CanSelectWorkspace) return; if (!SetProperty(ref _chain, value)) return; NotifyState(); if (!_loading) _ = NavigateAsync(async () => { _chain = value; OnPropertyChanged(nameof(SelectedChain)); await LoadChain(); }); }
     }
     public EmployeeDto? SelectedEmployee
     {
@@ -289,6 +291,7 @@ public sealed partial class WorkspaceViewModel : ViewModelBase, IDisposable
     {
         NotifyConnection();
         NotifyQuickCapture();
+        OnPropertyChanged(nameof(HasChains));
         NotifyNavigation();
         foreach (var p in new[] { nameof(IsIdle), nameof(HasPending), nameof(CanSelectWorkspace), nameof(CanEditDraft), nameof(CanEditCatalog), nameof(CanSaveRound), nameof(CanSaveResult), nameof(HasProject), nameof(HasChain), nameof(HasRound),
             nameof(SaveRoundLabel), nameof(SaveResultLabel), nameof(ProjectSummary), nameof(ProjectContext), nameof(EmployeeDescription), nameof(ChainSummary), nameof(CountLabel), nameof(ParentLabel), nameof(CurrentEmployeeLabel), nameof(RevisionLabel), nameof(RecordTitle), nameof(RecordMetadata), nameof(RecordInput), nameof(RecordBasePrompt), nameof(HistoricalOutput), nameof(HistoricalNote) }) OnPropertyChanged(p);

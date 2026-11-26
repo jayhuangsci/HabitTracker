@@ -29,7 +29,7 @@ public sealed class ActivityCard(ActivityDto record, int position, bool isLast)
     }
 }
 
-public sealed class EmployeeTimeline(EmployeeDto employee, IEnumerable<ActivityDto> records, int? total = null) : ViewModelBase
+public sealed class EmployeeTimeline(EmployeeDto employee, IEnumerable<ActivityDto> records, int? total = null, Guid? nextCursor = null) : ViewModelBase
 {
     private bool _selected;
     public EmployeeDto Employee { get; } = employee;
@@ -39,10 +39,11 @@ public sealed class EmployeeTimeline(EmployeeDto employee, IEnumerable<ActivityD
     public string Initial => Name.Length > 0 ? Name[..1] : "人";
     public ObservableCollection<ActivityCard> Cards { get; } = MakeCards(records);
     public int Total { get; } = total ?? records.Count();
-    public bool HasMore => Cards.Count < Total;
+    public Guid? NextCursor { get; } = nextCursor;
+    public bool HasMore => NextCursor.HasValue;
     public bool IsSelected { get => _selected; set => SetProperty(ref _selected, value); }
     public bool IsEmpty => Cards.Count == 0;
-    public string CountLabel => HasMore ? $"{Total} 轮记录 · 当前显示 {Cards.Count} 轮" : $"{Total} 轮工作记录";
+    public string CountLabel => Cards.Count < Total ? $"{Total} 轮记录 · 当前显示 {Cards.Count} 轮" : $"{Total} 轮工作记录";
     private static ObservableCollection<ActivityCard> MakeCards(IEnumerable<ActivityDto> records)
     {
         var ordered = records.OrderBy(x => x.CreatedUtc).ThenBy(x => x.Id).ToArray();
