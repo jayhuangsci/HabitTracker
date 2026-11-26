@@ -12,6 +12,7 @@
 ```powershell
 $env:PROMPTCREW_API_URL = 'http://127.0.0.1:5283/'
 $env:PROMPTCREW_KEY_FILE = 'C:/my-secrets/promptcrew-agent.key'
+$env:PROMPTCREW_TIMEOUT_SECONDS = '20'
 $env:PROMPTCREW_TOOLS_DLL = (Resolve-Path 'src/PromptCrew.Tools/bin/Release/net10.0/PromptCrew.Tools.dll').Path
 
 New-Item -ItemType Directory .local -Force | Out-Null
@@ -93,3 +94,5 @@ sequenceDiagram
 ## 验证
 
 `./scripts/Test-PromptCrewAgent.ps1` 启动独立本机服务，以管理员创建项目，再切换为项目范围密钥，经真实 CLI/HTTP 建立四名员工、六轮交接和分支。它验证原请求重放、不同内容冲突、祖先链与显式引用边界；请求文件和总结留在 `.local/agent-check-<UUID>/`，不修改正式数据，也不调用任何付费模型。
+
+工具支持 Ctrl+C 取消；超时、取消和断线返回失败 JSON，并保留原请求 ID / 请求文件。远端地址必须使用 HTTPS，HTTP 只允许本机回环。完整的连接设置、故障恢复和员工历史游标见 [desktop guide](promptcrew-desktop-guide.md)。

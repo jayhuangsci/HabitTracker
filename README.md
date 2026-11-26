@@ -2,7 +2,7 @@
 
 **A C# workspace for your AI team's prompts, results, and development history.**
 
-[![Build and test](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml/badge.svg?branch=main)](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml)
+[![Build and test](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml/badge.svg?branch=codex%2Fpromptcrew-quick-capture)](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4)
 ![WPF](https://img.shields.io/badge/Desktop-WPF-24523C)
 ![ASP.NET Core](https://img.shields.io/badge/API-ASP.NET_Core-193729)
@@ -15,6 +15,8 @@
 
 PromptCrew organizes AI work by project, employee, and task. Define roles such as gameplay designer, programmer, artist, or balance designer, then keep the actual prompts, model outputs, and artifact references from each round of work.
 
+Click **+ beside an employee** to save a new prompt immediately. Task, employee, and parent context stay visible; advanced fields are collapsed. Input-only rounds appear as **Pending output**, ready for results later.
+
 The overview gives **each employee a separate vertical history**. Select an employee to open their workspace, or select a history card to inspect the full input, role snapshot, output revisions, and context.
 
 The application handles recording and organization. The Agent host runs models and coordinates execution; PromptCrew receives records through its HTTP API and companion Skill.
@@ -26,7 +28,7 @@ The application handles recording and organization. The Agent host runs models a
 
 **The portable package runs on Windows 10/11 x64. No .NET installation, SDK, or PowerShell 7 is required.**
 
-1. Open [GitHub Actions](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml) and select the latest successful build of `main`.
+1. Open [GitHub Actions](https://github.com/jayhuangsci/HabitTracker/actions/workflows/promptcrew.yml) and select the latest successful build of `codex/promptcrew-quick-capture`.
 2. Under **Artifacts**, download `PromptCrew-win-x64` and extract it. If the download contains another ZIP with the same name, extract that inner ZIP too.
 3. Open the folder containing the following executables and double-click one:
 
@@ -99,12 +101,24 @@ flowchart LR
 
 The overview is a chronological reading view. Actual task parents, branches, input revisions, and references between tasks remain intact and are available in task details. See the [full demo walkthrough](docs/promptcrew-demo.md).
 
+## Quick capture: click, write, save
+
+1. Click **+** beside the intended employee. **Add employee** is a separate action.
+2. Enter the prompt. Reuse the current task, choose another, or create one inline. The header shows the actual task and parent.
+3. Save with the button or **Ctrl+Enter**. The employee history updates and confirms **Pending output**. **Esc** closes the panel while preserving the draft.
+
+![Enter a prompt directly for the selected employee](docs/images/promptcrew/quick-02-input.png)
+
+![Saved input immediately appears in that employee's history](docs/images/promptcrew/quick-03-saved.png)
+
+[Full walkthrough, connection settings, recovery and screenshots](docs/promptcrew-desktop-guide.md) · [Review findings and verification](docs/promptcrew-quality-review.md)
+
 ## Run from source
 
 Requires Windows 10/11 and the **.NET 10 SDK**. The source launcher works with Windows PowerShell 5.1:
 
 ```powershell
-git clone --branch main https://github.com/jayhuangsci/HabitTracker.git
+git clone --branch codex/promptcrew-quick-capture https://github.com/jayhuangsci/HabitTracker.git
 cd HabitTracker
 .\Start-PromptCrew-Demo.cmd
 ```
@@ -122,7 +136,10 @@ The portable executable tries port 5283 and selects an available port if it is o
 | Capability | Behavior |
 | --- | --- |
 | Projects and employees | Project background, constraints, and state; employee responsibilities, base prompts, Skills, and role templates |
-| Employee history | A separate chronological card chain for each employee, spanning tasks, with full records loaded on demand |
+| Employee history | Separate chronological card chains, expandable previews, 50-record cursor pages, and recycled WPF containers |
+| Quick capture | Employee-specific +, inline tasks, visible parent, optional fields, input-only saves, keyboard shortcuts, and saved feedback |
+| Connections | Connection tests, configurable timeout, cancel, recovery, stale-response protection, and HTTPS outside loopback |
+| Motion and sizing | 180 ms transitions, reduced motion preference and OS settings, 920×660 minimum window, scrollable forms |
 | Task chains | One parent per round, branches, employee handoffs, and references between tasks in the same project |
 | Input preservation | Original inputs and employee definition snapshots remain available; input edits create linked rounds |
 | Output revisions | Results and corrections append history; compare v2/v3 of one round or text from different rounds |
@@ -195,7 +212,7 @@ flowchart LR
 | `PromptCrew.Launcher` | Service startup, port selection, authenticated readiness checks, and shutdown |
 | `PromptCrew.Tools` | JSON arguments mapped to real HTTP calls, with credentials supplied by the host |
 
-Overview uses a lightweight query for input and latest-output previews, then loads complete records on demand. Composite foreign keys enforce project ownership for employees, tasks, parents, and references. Inputs and parent links are fixed after creation; revised inputs create records, and corrected outputs append revisions. The service stores UTC timestamps, while the desktop displays local time.
+Overview initially requests 50 lightweight previews per employee with at most three employee loads in flight. Stable timestamp/ID cursors load older records, an indexed SQLite query bounds each page, and WPF recycles offscreen cards. Complete records load on demand; participation queries include older tasks outside the loaded pages. Composite foreign keys enforce project ownership for employees, tasks, parents, and references. Inputs and parent links are fixed after creation; revised inputs create records, and corrected outputs append revisions. The service stores UTC timestamps, while the desktop displays local time.
 
 ```mermaid
 erDiagram
@@ -213,13 +230,13 @@ See the [implementation notes](docs/promptcrew-architecture.md) for code reuse, 
 
 ## Validation and packaging
 
-**75 automated tests passed: 25 PromptCrew API tests, 1 WPF workflow test, and 49 tests for the preserved fitness application.**
+**86 automated tests passed: 36 PromptCrew API/client tests, 1 extensive WPF workflow test, and 49 tests for the preserved fitness application.**
 
 | Verification | Coverage |
 | --- | --- |
 | API with real SQLite | Project isolation, valid chains, duplicate requests, concurrency conflicts, role snapshots, output history, and service restarts |
-| Actual WPF button bindings | Employee and card navigation, context across tasks, overview position recovery, isolated drafts, and legacy pending requests |
-| Agent tool demo | 31 CLI/HTTP calls creating 4 employees and 6 handoff rounds, checking branches, replay, conflicts, and historical comparisons |
+| Actual WPF button bindings | Employee + → prompt → save → history, double clicks, pending ID recovery, output conflicts, standalone cancellation, three-project races, and connection rollback |
+| Agent tool demo | 34 CLI/HTTP calls creating 4 employees and 6 handoff rounds, checking branches, input/task replay, cursor paging, conflicts, and historical comparisons |
 | Portable package checks | Personal and demo executables, occupied ports, authentication, desktop rendering, service shutdown, and incomplete-package errors |
 
 ```powershell
@@ -242,7 +259,7 @@ dotnet test HabitTracker.slnx -c Release
 | Drafts, keys, and connection information | The launcher's corresponding data directory |
 | Drafts when starting the desktop alone | `%LOCALAPPDATA%/PromptCrew/desktop-settings.json` |
 
-The current design targets personal use on one machine. Overview loads all lightweight project summaries; search pages contain up to 200 records. Context is limited to 256 ancestors and 500,000 compiled characters. Text comparison shows shared context and the replaced section without guaranteeing the shortest edit sequence. Project keys allow reads and writes within their scope; read-only permissions are not yet available. Local files rely on operating-system access controls.
+The current design targets personal use on one machine. Employee histories load 50 records at a time, with a maximum API page of 200. The compatibility `/activity` endpoint and selected-task branch tree remain unpaged; search pages contain up to 200 full records. Context is limited to 256 ancestors and 500,000 compiled characters. Text comparison shows shared context and the replaced section without guaranteeing the shortest edit sequence. Project keys allow reads and writes within their scope; read-only permissions are not yet available. Local files rely on operating-system access controls. Pending requests with an uncertain outcome retain their original IDs even after a 404; the editor unlocks only after confirmed success or a first definitive rejection. A later conflict after an uncertain write requires server-side reconciliation, rather than silently minting another ID.
 
 ## Repository history
 

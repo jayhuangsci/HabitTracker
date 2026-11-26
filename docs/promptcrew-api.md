@@ -2,6 +2,8 @@
 
 API 与旧训练服务独立，默认 `http://127.0.0.1:5283`。运行 `dotnet run --project src/PromptCrew.Api` 后，可在开发环境访问 `/swagger` 与 `/swagger/v1/swagger.json`。枚举使用下表中的字符串。
 
+客户端远端连接必须使用 HTTPS；明文 HTTP 仅允许本机 localhost / 回环地址。密钥通过外部文件由宿主读取。
+
 ## 认证和项目权限
 
 所有 `/api` 路由接受 `X-Api-Key: <key>`，也接受 Bearer。服务首次启动在数据目录创建 `admin.key`。管理员可创建项目和签发/撤销项目密钥；Agent 使用限定在 1–32 个项目的密钥。数据库只保存项目密钥的 SHA-256 摘要，签发响应的原文只返回一次。
@@ -29,6 +31,7 @@ API 与旧训练服务独立，默认 `http://127.0.0.1:5283`。运行 `dotnet r
 | POST | `/api/projects/p/rounds/r/results` | 追加输出版本 |
 | GET | `/api/projects/p/rounds` | 搜索，见下文 |
 | GET | `/api/projects/p/chains/c/graph` | 所有节点、父节点、引用与修订关系 |
+| GET | `/api/projects/p/activity-page?employeeId=e&take=50` | 员工历史分页，支持 `beforeId` 稳定游标 |
 | GET | `/api/projects/p/activity` | 项目内全部员工历史的轻量摘要，按创建时间正序 |
 | GET | `/api/projects/p/chains/c/context` | 当前员工、祖先链及显式引用 |
 | GET | `/api/projects/p/compare?left=r&right=r2` | 原始输入 / 最新输出逐行对比 |
@@ -44,6 +47,8 @@ API 与旧训练服务独立，默认 `http://127.0.0.1:5283`。运行 `dotnet r
 **项目：** `name` 必填且最多 120 字符；`goal`、`constraints` 最多 10,000；`background` 最多 30,000；`status` 为 Active / Paused / Archived。更新须带 `expectedVersion`。
 
 **员工：** `name`、`role` 必填且最多 100；`responsibilities` 必填且最多 10,000；`basePrompt` 必填且最多 30,000；`skills` 最多 24 项，每项 120；`isActive` 默认 true。更新须带 `expectedVersion`。关联 Skills 只保存名称。
+
+**任务链：** 新建可带 `createId` UUID，调用前保存在请求文件中；相同创建 ID 与原始创建内容重试返回当前任务。任务后续改名不影响重试；不同内容返回 409。更新不使用此字段。
 
 **任务链：** `name` 必填最多 120；`goal` 必填最多 10,000；`acceptanceCriteria` 最多 10,000；`status` 为 Active / Completed / Archived。更新须带 `expectedVersion`。追加轮次也会增加链版本，请先重新读取再编辑配置。
 
@@ -98,7 +103,9 @@ API 与旧训练服务独立，默认 `http://127.0.0.1:5283`。运行 `dotnet r
 
 ## 搜索和上下文
 
-`activity` 用于桌面总览。每条包含记录/员工/任务 ID、任务名称、时间、状态、版本、真实父节点与输入修订目标，以及最多 160 字符的输入预览和 220 字符的最新输出预览。不载入完整历史输出或角色提示词；点击卡片时再获取完整轮次。接口校验项目范围，时间返回 UTC。桌面按员工分组，视觉连接仅表示各员工记录的时间顺序，不修改数据库的父节点关系。
+桌面使用 `activity-page`：`employeeId` 必填；`take` 默认 50、最多 200；首次 `skip=0`。后续传 `beforeId=nextCursor`、`skip=0`，响应 `hasMore=false` 时停止。游标按 UTC 时间和 ID 定位，其他客户端新增记录不影响旧记录翻页；刷新首屏读取新记录。返回 `items/total/skip/take/hasMore/nextCursor`。`GET chains?employeeId=e` 返回员工参与的完整任务集合。
+
+兼容的 `activity` 接口仍返回项目全部摘要。每条包含记录/员工/任务 ID、任务名称、时间、状态、版本、真实父节点与输入修订目标，以及最多 160 字符的输入预览和 220 字符的最新输出预览。不载入完整历史输出或角色提示词；点击卡片时再获取完整轮次。接口校验项目范围，时间返回 UTC。桌面按员工分组，视觉连接仅表示各员工记录的时间顺序，不修改数据库的父节点关系。
 
 搜索参数：`q`（输入、轮次备注和全部历史输出），`employeeId`、`chainId`、`tag`（精确标签）、`status`、`skip`、`take`（1–200，默认 50）。返回 `items/total/skip/take`，按创建时间降序。
 

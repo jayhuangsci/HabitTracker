@@ -23,11 +23,13 @@ $runtimeNote
   PromptCrew-Demo.exe   游戏演示
   PromptCrew.exe        正式工作区
 无需命令行。请保留旁边的 api、desktop 和 tools 文件夹。
+记录提示词：点击左侧员工旁 +，输入后保存；Ctrl+Enter 保存，Esc 关闭并保留草稿。
+连接设置支持测试、取消与超时；远端地址须为 HTTPS。
 数据保存到 %LOCALAPPDATA%/PromptCrew/personal 或 demo，不读取原训练数据。
 关闭窗口会停止启动器创建的服务；Agent 调用期间请保持窗口打开。
 默认端口占用时会选择其他空闲端口，当前地址见数据目录 connection.json。
 Agent 可执行工具：tools/PromptCrew.Tools.exe invoke request.json
-源码、API 与 Skill 设置：https://github.com/jayhuangsci/HabitTracker/tree/main
+源码、API 与 Skill 设置：https://github.com/jayhuangsci/HabitTracker/tree/codex/promptcrew-quick-capture
 "@ | Set-Content -LiteralPath (Join-Path $package '使用说明.txt') -Encoding utf8
 $archive = Join-Path $artifacts "PromptCrew-$Runtime.zip"
 $release = Join-Path $artifacts "PromptCrew-$Runtime"
